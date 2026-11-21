@@ -18,15 +18,13 @@ jobs:
   deploy:
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Restore icons
+      - name: Build icons
         run: |
-          for s in 180 192 512; do
-            base64 -d "icons/icon-$s.png.b64" > "icons/icon-$s.png"
-          done
+          python3 -m pip install --quiet --disable-pip-version-check pillow
+          python3 tools/make_icons.py
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
