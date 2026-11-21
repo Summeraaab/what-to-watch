@@ -1,0 +1,17 @@
+{
+  "name": "今晚看什么 · 影视推荐器",
+  "short_name": "今晚看什么",
+  "description": "按你的口味，从电影、剧集、番剧、综艺、小说、漫画和博主栏目里挑一部。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c0c0f",
+  "theme_color": "#0c0c0f",
+  "categories": ["entertainment", "lifestyle"],
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
