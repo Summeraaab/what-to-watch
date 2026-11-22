@@ -3,56 +3,61 @@
 一个可以安装到手机桌面的 PWA。它只回答一个问题：**现在这点时间，看什么？**
 
 - 内置 60 部精选作品（电影 / 剧集 / 番剧 / 动画 / 综艺 / 小说 / 漫画 / 博主栏目）
-- 按你看过什么、打几分，给每部片算贴合度，并用一句话说清「为什么推给你」
-- 时间（今晚只有 30 分钟？）+ 类型筛选，永远不会推给你一部 3 小时的电影
-- 数据默认只存在本机（localStorage），可导出 / 导入 JSON 备份
-- 可选接入 TMDB 实时片库与 AI 理由改写（Key 只存本机）
+- 已内置 TMDB 实时片库，装上就多出一百多部在线作品
+- 每条推荐都给出：贴合度、为什么推给你、故事梗概、吸引人的地方
+- 按「现在有多少时间」和类型筛选
+- 「看过了 / 不感兴趣」会持续修正你的口味画像
+- 纯前端，无后端；记录保存在浏览器本地，可导出 / 导入
+- 支持 PWA：同一地址自动更新，不用重新下载
 
 ## 安装到手机
 
-1. 用手机浏览器打开部署地址（推荐 Chrome / Edge / Safari）
-2. Android：菜单 →「安装应用」或「添加到主屏幕」
+1. 用手机浏览器打开 Pages 地址（Chrome / Safari 均可）
+2. Android Chrome：菜单 →「安装应用」或「添加到主屏幕」
 3. iOS Safari：分享 →「添加到主屏幕」
-4. 装好之后从桌面图标启动，全屏无地址栏
+4. 之后从桌面图标打开，就是全屏应用；有新版本时打开会自动更新
+
+## 接入 TMDB
+
+当前版本已内置一个 TMDB v3 Key，装上就能用，不需要自己注册。默认 API 地址是 `https://api.tmdb.org/3`（比 `api.themoviedb.org` 在国内网络下响应快很多），失败时会自动回退到备用域名。
+
+- 想换成自己的 Key：「我的 → 设置 → TMDB 实时片库」里粘贴保存即可，设置会覆盖内置值
+- Key 存在浏览器 `localStorage`，会随「导出备份」一起带走
+- 这个内置 Key 写在公开仓库里，属于共享凭据，可能被别人一起用、被限流；在意的话换成自己的
+- 海报域名 `image.tmdb.org` 若被网络挡住，卡片会自动退回文字占位，不影响推荐和详情
+
+自己申请 Key 的路径：注册 <https://www.themoviedb.org> → Settings → API → 复制 **API Key (v3 auth)**。
+
+> 如果某个 API 域名在你的网络下不通，可在设置里把 API 地址换成能访问的镜像（保持 `https://…/3` 格式）。
+
+## AI 增强（可选）
+
+设置里填写任意 OpenAI 兼容接口的 Base URL、模型名和 Key。开启后，只有「为什么推给你」这句话会被模型改写得更自然；排序始终由本地规则决定，失败会自动退回本地理由。
 
 ## 更新机制
 
-代码更新后不需要卸载重装：Service Worker 会在后台拉新版本，切换 UI 时自动提示，点一下即生效，图标和桌面位置保持不变。
+代码推送到 `main` 分支后，GitHub Actions 自动部署（构建时用 `tools/make_icons.py` 生成图标）；Service Worker 带版本号的缓存会在新版本激活时替换旧缓存。用户不需要卸载重装，同一个图标打开就是新版。
 
-## 目录结构
+发版时改两个地方：
+
+- `js/store.js` 里的 `APP_VERSION`
+- `sw.js` 里的 `VERSION` 与 `CACHE` 前缀
+
+## 目录
 
 ```
-index.html              应用外壳（按序加载下面的脚本）
-css/app.css             样式
-js/data-1~3.js          内置片库（分段存放，便于维护）
-js/data.js              拼装片库
-js/store.js             状态读写、导入导出、同步适配器占位
-js/engine.js            口味画像、打分、推荐理由
-js/tmdb.js              TMDB 实时片库客户端
-js/app.js               工具函数与首页
-js/views.js             片库 / 我的 / 设置
-js/detail.js            详情页与冷启动
-js/events.js            事件、AI 增强、PWA 启动
-sw.js                   离线缓存与版本更新
-manifest.webmanifest    安装清单
-tools/make_icons.py     构建期生成图标
-.github/workflows/pages.yml   GitHub Pages 自动部署
+index.html            应用外壳
+css/app.css           样式
+js/data-1.js ~ 3.js    内置片库（分段数据）
+js/data.js            片库合并入口
+js/store.js           本地存储 / 导入导出 / 同步接口占位
+js/engine.js          口味画像与推荐打分
+js/tmdb.js            TMDB 在线数据源
+js/app.js             基础工具与首页
+js/views.js           片库 / 我的 / 设置视图
+js/detail.js          详情页与首次引导
+js/events.js          交互事件 / AI 增强 / PWA 更新
+sw.js                 Service Worker
+manifest.webmanifest  PWA 清单
+icons/*.png          应用图标（由 tools/make_icons.py 构建期生成）
 ```
-
-## 接入 TMDB（可选）
-
-1. 到 https://www.themoviedb.org/settings/api 申请免费 API Key
-2. 应用内「设置 → TMDB」填入 Key，可改镜像地址（国内直连 api.themoviedb.org 可能不通）
-3. 片库里会出现「实时」来源的条目，与内置片库一起参与推荐
-
-## 接入 AI 理由（可选）
-
-设置里填 OpenAI 兼容的 `base_url` / `key` / `model`。AI 只改写「为什么推给你」这一句，排序始终由本地规则决定；请求失败会自动回退到规则生成的文案。
-
-## 部署
-
-推送到 `main` 后由 GitHub Actions 自动构建并发布：https://summeraaab.github.io/what-to-watch/
-
-## 隐私
-
-TMDB Key、AI Key 与观看记录都只保存在当前设备浏览器里，不上传任何服务器。

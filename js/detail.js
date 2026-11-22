@@ -17,7 +17,9 @@ function detailHTML(it) {
         <span class="match" style="margin-left:auto">${pct}% 贴合</span>
         <button class="x" data-act="close">×</button>
       </div>
-      ${poster ? `<img class="poster" style="width:100%;height:150px;margin:10px 0 0" src="${esc(poster)}" alt="" referrerpolicy="no-referrer">` : ''}
+      ${poster
+        ? `<img class="poster" style="width:100%;height:150px;margin:10px 0 0" src="${esc(poster)}" alt="" referrerpolicy="no-referrer" data-drop="1">`
+        : ''}
       <h2 class="mtitle serif">${esc(it.title)}</h2>
       <div class="mmeta">${esc(it.status)} · ${esc(it.pace)} · ${esc(it.mood.join(' / '))}${it.tagline ? ' · ' + esc(it.tagline) : ''}</div>
 
