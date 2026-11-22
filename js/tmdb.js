@@ -35,6 +35,136 @@ const TMDB = {
   on: function () { return !!this.key(); },
   poster: function (it, size) { return it.posterPath ? this.imgBase() + '/' + (size || 'w342') + it.posterPath : ''; },
 
+  /* 内置片库没有 TMDB id，用 people-map.js 的人工映射补上 */
+  entryOf: function (it) {
+    if (!it) return null;
+    if (it.src === 'tmdb' && it.tmdbId) return { media: it.media, id: it.tmdbId };
+    const m = (typeof TMDB_MAP !== 'undefined') ? TMDB_MAP[it.id] : null;
+    return m ? { media: m[0], id: m[1] } : null;
+  },
+  canCredits: function (it) {
+    if (!this.entryOf(it)) return false;
+    return ['电影', '剧集', '番剧', '动画', '综艺'].indexOf(it.type) > -1;
+  },
+
+  credStore: function () {
+    try { return JSON.parse(localStorage.getItem('watchnext_credits_v1') || '{}'); } catch (e) { return {}; }
+  },
+  saveCredStore: function (cache) {
+    try {
+      const keys = Object.keys(cache);
+      if (keys.length > 80) {
+        keys.sort(function (a, b) { return (cache[a].at || 0) - (cache[b].at || 0); });
+        keys.slice(0, keys.length - 80).forEach(function (k) { delete cache[k]; });
+      }
+      localStorage.setItem('watchnext_credits_v1', JSON.stringify(cache));
+    } catch (e) { /* 空间不足时静默失败 */ }
+  },
+  normalizeCredits: function (d, media) {
+    const out = [], seen = {};
+    function add(id, name, role, as, profile) {
+      if (!id || !name) return;
+      const key = id + '|' + role;
+      if (seen[key]) return;
+      seen[key] = 1;
+      out.push({ id: String(id), name: name, role: role, as: as || '', profile: profile || '' });
+    }
+    (d.crew || []).forEach(function (c) {
+      const jobs = media === 'movie' ? [c.job] : ((c.jobs || []).map(function (j) { return j.job; }));
+      if (jobs.indexOf('Director') > -1) add(c.id, c.name, '导演', '', c.profile_path);
+      if (jobs.indexOf('Writer') > -1 || jobs.indexOf('Screenplay') > -1 || jobs.indexOf('Story') > -1 || jobs.indexOf('Creator') > -1) {
+        add(c.id, c.name, '编剧', '', c.profile_path);
+      }
+    });
+    (d.cast || []).slice(0, 15).forEach(function (c) {
+      const ch = media === 'movie' ? c.character : ((c.roles && c.roles[0] && c.roles[0].character) || '');
+      add(c.id, c.name, '演员', ch ? ('饰 ' + ch) : '', c.profile_path);
+    });
+    return out.slice(0, 22);
+  },
+  async credits(it) {
+    if (it._credits) return it._credits;
+    const ent = this.entryOf(it);
+    if (!ent) return [];
+    const cache = this.credStore();
+    const hit = cache[it.id];
+    if (hit && hit.people && hit.at && Date.now() - hit.at < 7 * 24 * 3600 * 1000) {
+      it._credits = hit.people;
+      return hit.people;
+    }
+    const d = await this.api(ent.media === 'movie' ? '/movie/' + ent.id + '/credits' : '/tv/' + ent.id + '/aggregate_credits', {});
+    const people = this.normalizeCredits(d || {}, ent.media);
+    it._credits = people;
+    cache[it.id] = { at: Date.now(), people: people };
+    this.saveCredStore(cache);
+    return people;
+  },
+
+  peopleCache: {},
+  deptZh: function (dept) {
+    return ({ Acting: '演员', Directing: '导演', Writing: '编剧', Production: '制片', Sound: '声音', Camera: '摄影', Art: '美术', Editing: '剪辑', Creator: '主创' })[dept] || '影视人';
+  },
+  async person(id) {
+    id = String(id);
+    const hit = this.peopleCache[id];
+    if (hit && Date.now() - hit.at < 3600 * 1000) return hit.p;
+    const d = await this.api('/person/' + id, { append_to_response: 'combined_credits' });
+    const cc = d.combined_credits || {};
+    const map = {};
+    function add(x, kind) {
+      const media = x.media_type;
+      if (media !== 'movie' && media !== 'tv') return;
+      const title = x.title || x.name || '';
+      if (!title) return;
+      const key = media + ':' + x.id;
+      let w = map[key];
+      if (!w) {
+        const date = x.release_date || x.first_air_date || '';
+        w = map[key] = {
+          id: x.id, media: media, title: title, date: date, year: date ? Number(date.slice(0, 4)) : 0,
+          vote: x.vote_average || 0, votes: x.vote_count || 0, popularity: x.popularity || 0,
+          posterPath: x.poster_path || '', characters: [], jobs: []
+        };
+      }
+      if (kind === 'cast' && x.character) w.characters.push(x.character);
+      if (kind === 'crew' && x.job) w.jobs.push(x.job);
+    }
+    (cc.cast || []).forEach(function (x) { add(x, 'cast'); });
+    (cc.crew || []).forEach(function (x) { add(x, 'crew'); });
+    const works = Object.keys(map).map(function (k) { return map[k]; })
+      .filter(function (w) { return w.votes >= 5 || w.popularity >= 1 || (w.date && Date.parse(w.date) > Date.now()); })
+      .sort(function (a, b) { return (b.vote * 0.6 + Math.min(4, b.popularity / 8)) - (a.vote * 0.6 + Math.min(4, a.popularity / 8)); })
+      .slice(0, 80);
+    const p = {
+      id: id, name: d.name || '未命名', dept: d.known_for_department || '',
+      deptZh: this.deptZh(d.known_for_department),
+      biography: d.biography || '', profilePath: d.profile_path || '', works: works
+    };
+    this.peopleCache[id] = { at: Date.now(), p: p };
+    return p;
+  },
+
+  applyDetail: function (it, d) {
+    if (!d) return it;
+    if (d.overview) it.synopsis = d.overview;
+    if (it.media === 'movie' && d.runtime) it.dur = d.runtime;
+    if (it.media === 'tv') {
+      const ert = d.episode_run_time && d.episode_run_time[0];
+      if (ert) it.dur = ert;
+      if (d.number_of_episodes) it.eps = d.number_of_episodes;
+    }
+    if (d.status) it.status = { Ended: '完结', 'Returning Series': '连载', Canceled: '已取消', InProduction: '制作中' }[d.status] || d.status;
+    it.tagline = d.tagline || '';
+    it.homepage = d.homepage || '';
+    if (d.vote_average) it.vote = d.vote_average;
+    if (d.vote_count) it.voteCount = d.vote_count;
+    if (d.genres) {
+      it.tags = d.genres.map(function (g) { return GENRE_ZH[g.id] || g.name; }).slice(0, 5);
+    }
+    it.detailLoaded = true;
+    return it;
+  },
+
   api: async function (path, params) {
     const key = this.key();
     if (!key) throw new Error('还没有填写 TMDB API Key');
@@ -163,24 +293,17 @@ const TMDB = {
   async detail(it) {
     if (!it || it.src !== 'tmdb' || it.detailLoaded) return it;
     const d = await this.api('/' + it.media + '/' + it.tmdbId, {});
-    if (d) {
-      if (d.overview) it.synopsis = d.overview;
-      if (it.media === 'movie' && d.runtime) it.dur = d.runtime;
-      if (it.media === 'tv') {
-        const ert = d.episode_run_time && d.episode_run_time[0];
-        if (ert) it.dur = ert;
-        if (d.number_of_episodes) it.eps = d.number_of_episodes;
-      }
-      if (d.status) it.status = { Ended: '完结', 'Returning Series': '连载', Canceled: '已取消', InProduction: '制作中' }[d.status] || d.status;
-      it.tagline = d.tagline || '';
-      it.homepage = d.homepage || '';
-      if (d.vote_average) it.vote = d.vote_average;
-      if (d.vote_count) it.voteCount = d.vote_count;
-      if (d.genres) {
-        it.tags = d.genres.map(function (g) { return GENRE_ZH[g.id] || g.name; }).slice(0, 5);
-      }
-      it.detailLoaded = true;
-    }
+    this.applyDetail(it, d);
+    return it;
+  },
+
+  /* 从人物卡点进一部不在片库里的作品：取详情并注册成临时条目 */
+  async work(media, id) {
+    const raw = await this.api('/' + media + '/' + id, {});
+    const it = this.mapItem(raw, media);
+    if (!it) throw new Error('这部作品没有可用详情');
+    this.applyDetail(it, raw);
+    registerItems([it]);
     return it;
   }
 };
