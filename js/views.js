@@ -57,6 +57,9 @@ function renderProfile() {
   const rated = Object.keys(state.ratings).map(getItem).filter(Boolean)
     .sort(function (a, b) { return (state.ratings[b.id] || 0) - (state.ratings[a.id] || 0); });
   const disliked = Object.keys(state.disliked).map(getItem).filter(Boolean);
+  const followed = Object.keys(state.followed || {}).map(function (id) {
+    return Object.assign({ id: id }, state.followed[id]);
+  });
   const wanted = Object.keys(state.interested).map(getItem).filter(Boolean)
     .filter(function (it) { return !state.ratings[it.id]; })
     .sort(function (a, b) { return (state.interested[b.id] || 0) - (state.interested[a.id] || 0); });
@@ -96,6 +99,20 @@ function renderProfile() {
       <div><b>${wanted.length}</b><span>部想看</span></div>
     </div>
   </div>
+  ${followed.length ? `<div class="panel"><h4>关注的人 · ${followed.length}</h4>
+    ${followed.map(function (p) {
+      const latest = (p.latest || []).map(function (w) {
+        return `<button class="sim" data-act="open-work" data-media="${esc(w.media)}" data-tid="${esc(w.id)}">${esc(w.title)}${w.year ? ' · ' + w.year : ''}</button>`;
+      }).join('');
+      return `<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.07)">
+        <div class="seenrow" style="border:0;padding:0"><span class="t" data-act="person" data-pid="${esc(p.id)}" style="cursor:pointer">${esc(p.name)} <span class="hint" style="margin:0">${esc(p.dept || '')}</span></span>
+          <button class="rchip" data-act="person" data-pid="${esc(p.id)}">作品</button>
+          <button class="rchip" data-act="unfollow" data-id="${esc(p.id)}">取关</button></div>
+        ${latest ? '<div class="hint" style="margin:6px 0 4px">新作 / 最近</div><div class="simrow" style="margin-top:0">' + latest + '</div>' : ''}
+      </div>`;
+    }).join('')}
+    <p class="hint">点名字看人物卡；关注的人有新作时优先出现在首页。</p>
+  </div>` : ''}
   <div class="panel"><h4>你偏爱的标签</h4>${tagBars}
     ${moods.length ? '<h4 style="margin-top:16px">你偏爱的情绪</h4>' + moodBars : ''}
   </div>
