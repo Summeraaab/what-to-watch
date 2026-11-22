@@ -14,7 +14,7 @@ function buildProfile() {
     const r = state.ratings[it.id];
     if (!r) return;
     seen[it.id] = true;
-    const w = r === 5 ? 1 : r === 3 ? 0.5 : r === 1 ? -0.75 : 0;
+    const w = r >= 5 ? 1 : r === 4 ? 0.7 : r === 3 ? 0.35 : r === 2 ? -0.35 : r === 1 ? -0.8 : 0;
     if (!w) return;
     it.tags.forEach(function (t) { tagW[t] = (tagW[t] || 0) + w; });
     it.mood.forEach(function (t) { moodW[t] = (moodW[t] || 0) + w; });
@@ -27,7 +27,7 @@ function buildProfile() {
     it.tags.forEach(function (t) { tagW[t] = (tagW[t] || 0) - 0.55; });
     it.mood.forEach(function (t) { moodW[t] = (moodW[t] || 0) - 0.35; });
   });
-  /* 「感兴趣」= 弱正向信号：只加 0.4 权重，比「还不错」轻，避免没看过就过度收窄 */
+  /* 「感兴趣」= 弱正向信号：只加 0.4 权重，轻于 4 星，避免没看过就过度收窄 */
   const wantIds = Object.keys(state.interested).filter(function (id) { return !state.ratings[id]; });
   wantIds.forEach(function (id) {
     const it = getItem(id);
