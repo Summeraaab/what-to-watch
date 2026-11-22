@@ -69,9 +69,10 @@ function renderProfile() {
   }).join('') : '';
 
   const seenRows = rated.length ? rated.map(function (it) {
+    const cur = state.ratings[it.id] || 0;
     return `<div class="seenrow"><span class="t">${esc(it.title)}</span>
-      ${[[5, '喜欢'], [3, '一般'], [1, '不喜欢']].map(function (o) {
-        return `<button class="rchip ${state.ratings[it.id] === o[0] ? 'on' : ''}" data-act="rate" data-id="${esc(it.id)}" data-val="${o[0]}">${o[1]}</button>`;
+      ${[1, 2, 3, 4, 5].map(function (n) {
+        return `<button class="rchip ${cur >= n ? 'on' : ''}" data-act="rate" data-id="${esc(it.id)}" data-val="${n}" title="${n} 星" aria-label="${n} 星" style="padding:3px 4px;font-size:13px;line-height:1">★</button>`;
       }).join('')}</div>`;
   }).join('') : '<p class="hint">还没有标记过作品。</p>';
 
@@ -90,7 +91,7 @@ function renderProfile() {
   <div class="panel"><h4>状态概览</h4>
     <div class="stat">
       <div><b>${rated.length}</b><span>部看过</span></div>
-      <div><b>${Object.keys(state.ratings).filter(function (k) { return state.ratings[k] === 5; }).length}</b><span>部很喜欢</span></div>
+      <div><b>${Object.keys(state.ratings).filter(function (k) { return state.ratings[k] >= 4; }).length}</b><span>部 4 星以上</span></div>
       <div><b>${wanted.length}</b><span>部想看</span></div>
     </div>
   </div>
@@ -118,18 +119,18 @@ function renderSettings() {
     <button class="ghost-btn" data-act="back-profile">← 返回我的</button></div>
   <section class="hero" style="padding-bottom:8px">
     <h1 class="serif" style="font-size:28px">数据源与增强</h1>
-    <p class="lede">Key 只存在这台设备的浏览器里，不会上传到任何服务器，也不会写进公开仓库。</p>
+    <p class="lede">已内置一个 TMDB 共享 Key，装上就能用；换成自己的 Key 后只存在这台设备的浏览器里，不会上传。</p>
   </section>
 
   <div class="panel">
     <h4>TMDB 实时片库</h4>
     <div class="field"><label>API Key（v3 auth）</label>
       <input type="password" id="tmdb-key" placeholder="粘贴你的 TMDB API Key" value="${esc(t.key)}" autocomplete="off">
-      <div class="tip">在 themoviedb.org 登录后，Settings → API → 复制 “API Key (v3 auth)”。不填也能用，只是只有内置 ${LIBRARY.length} 部。</div>
+      <div class="tip">在 themoviedb.org 登录后，Settings → API → 复制 “API Key (v3 auth)”。留空则继续用内置 Key。</div>
     </div>
     <div class="field"><label>API 地址</label>
       <input type="text" id="tmdb-base" value="${esc(t.base)}" autocomplete="off">
-      <div class="tip">如果直连 api.themoviedb.org 不通，可以改成可访问的镜像地址，格式保持 https://…/3。</div>
+      <div class="tip">默认 api.tmdb.org 比 api.themoviedb.org 快；如果仍不通，可改成能访问的镜像地址，格式保持 https://…/3。</div>
     </div>
     <div class="field"><label>图片地址</label>
       <input type="text" id="tmdb-img" value="${esc(t.img)}" autocomplete="off">
