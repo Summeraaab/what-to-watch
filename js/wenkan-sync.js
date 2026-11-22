@@ -1,6 +1,7 @@
-/* 闻刊 → 书库 一键同步：在设置的书库面板加同步按钮，接收书库回传的书目 */
+/* 闻刊 → 书库 一键同步：同标签页往返，用 window.name 携带书目，不依赖弹窗 opener */
 (function () {
   var KEY = 'watchnext_library_v1';
+  var PREFIX = 'WENKAN_SYNC:';
   var DEFAULT_READER = 'https://4ktzkbxqau69p.doubao.link/app/app_17jed742mpf';
   var SHUKU_ORIGIN = 'https://4ktzkbxqau69p.doubao.link';
 
@@ -22,20 +23,127 @@
     try { localStorage.setItem(KEY, JSON.stringify(lib)); } catch (e) {}
   }
 
+  function normalizeBooks(raw) {
+    var books = [];
+    var seen = {};
+    if (!Array.isArray(raw)) return books;
+    raw.forEach(function (b) {
+      if (!b) return;
+      var title = String(b.title || '').trim();
+      if (!title) return;
+      var id = String(b.id || title);
+      if (seen[id]) return;
+      seen[id] = 1;
+      books.push({
+        id: id,
+        title: title,
+        author: String(b.author || ''),
+        type: String(b.type || 'text'),
+        progress: Math.max(0, Math.min(100, Number(b.progress_pct != null ? b.progress_pct : b.progress) || 0)),
+        lastRead: b.last_read || b.lastRead || null
+      });
+    });
+    return books;
+  }
+
+  function applyPayload(d) {
+    if (!d || d.type !== 'wenkan:shuku-books' || !Array.isArray(d.books)) return -1;
+    var books = normalizeBooks(d.books);
+    var lib = loadLib();
+    lib.books = books;
+    lib.syncedAt = Number(d.at) || Date.now();
+    lib.source = 'bridge';
+    saveLib(lib);
+    return books.length;
+  }
+
+  function cleanWenkanParams() {
+    try {
+      var u = new URL(location.href);
+      if (!u.searchParams.has('wenkan') && !u.searchParams.has('wenkan_data')) return;
+      u.searchParams.delete('wenkan');
+      u.searchParams.delete('wenkan_data');
+      var clean = u.pathname + (u.searchParams.toString() ? '?' + u.searchParams.toString() : '') + u.hash;
+      history.replaceState(null, '', clean);
+    } catch (e) {}
+  }
+
+  function toastLater(msg) {
+    setTimeout(function () {
+      if (typeof toast === 'function') toast(msg);
+    }, 700);
+  }
+
+  var HANDOFF_N = -1;
+
+  function consumeHandoff() {
+    var raw = '';
+    try { raw = String(window.name || ''); } catch (e) { return false; }
+    if (raw.indexOf(PREFIX) !== 0) return false;
+    var d = null;
+    try { d = JSON.parse(raw.slice(PREFIX.length)); } catch (e) { d = null; }
+    try { window.name = ''; } catch (e) {}
+    if (!d) return false;
+    var n = applyPayload(d);
+    if (n < 0) return false;
+    HANDOFF_N = n;
+    cleanWenkanParams();
+    return true;
+  }
+
+  function consumeQueryHandoff() {
+    var raw = '';
+    try {
+      var q = new URLSearchParams(location.search);
+      raw = q.get('wenkan_data') || '';
+    } catch (e) { return false; }
+    if (!raw) return false;
+    var d = null;
+    try { d = JSON.parse(raw); } catch (e) { d = null; }
+    if (!d) return false;
+    var n = applyPayload(d);
+    if (n < 0) return false;
+    HANDOFF_N = n;
+    cleanWenkanParams();
+    return true;
+  }
+
+  var HANDOFF = consumeHandoff();
+  if (!HANDOFF) HANDOFF = consumeQueryHandoff();
+
+  /* 旧版 index 顺序是 library-link 先加载；它已经缓存了旧书目，写完 storage 后刷新一次让它重读 */
+  if (HANDOFF && typeof window.findLibraryBook === 'function') {
+    try { sessionStorage.setItem('wenkan_handoff_n', String(HANDOFF_N)); } catch (e) {}
+    setTimeout(function () { location.reload(); }, 90);
+    return;
+  }
+
+  /* 旧顺序刷新后，把数字从 sessionStorage 里取出来补一条 toast */
+  try {
+    var pending = sessionStorage.getItem('wenkan_handoff_n');
+    if (pending !== null) {
+      sessionStorage.removeItem('wenkan_handoff_n');
+      toastLater('已从书库同步 ' + (Number(pending) || 0) + ' 本');
+    } else if (HANDOFF) {
+      toastLater('已从书库同步 ' + HANDOFF_N + ' 本');
+    }
+  } catch (e) {
+    if (HANDOFF) toastLater('已从书库同步 ' + HANDOFF_N + ' 本');
+  }
+
+  function syncReturnURL() {
+    var path = location.pathname || '/';
+    return location.origin + path + '#settings';
+  }
+
   function syncURL() {
     var lib = loadLib();
     var base = (lib.readerBase || DEFAULT_READER).replace(/[#?].*$/, '').replace(/\/+$/, '');
-    return base + '?wenkan=sync';
+    return base + '?wenkan=sync&return=' + encodeURIComponent(syncReturnURL());
   }
 
   function openSync() {
-    var w = window.open(syncURL(), '_blank');
-    if (!w) {
-      if (typeof toast === 'function') toast('浏览器拦截了弹窗，请允许弹窗后重试');
-      return;
-    }
-    try { w.focus(); } catch (e) {}
-    if (typeof toast === 'function') toast('已打开书库，请在书库点「同步到闻刊」');
+    location.href = syncURL();
   }
 
   function lastSyncText() {
@@ -66,7 +174,7 @@
 
     var hint = document.createElement('p');
     hint.className = 'hint';
-    hint.textContent = '点「从书库同步」会打开书库；在书库点「同步到闻刊」后，书目会自动回到这里。只同步普通书架的书目和阅读进度，隐藏书架、视频、正文、书签和笔记都不会传。';
+    hint.textContent = '点「从书库同步」会先打开书库；书库整理好书目后会自动回到这里。只同步普通书架的书目和阅读进度，隐藏书架、视频、正文、书签和笔记都不会传。';
     panel.insertBefore(hint, acts);
 
     var last = lastSyncText();
@@ -79,41 +187,16 @@
     }
   }
 
+  /* 兼容旧版弹窗桥接：收到 postMessage 后仍按原逻辑刷新 */
   window.addEventListener('message', function (e) {
     var allowed = [SHUKU_ORIGIN];
     if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
       allowed.push('http://127.0.0.1:8000', 'http://localhost:8000');
     }
     if (allowed.indexOf(e.origin) < 0) return;
-    var d = e.data;
-    if (!d || d.type !== 'wenkan:shuku-books' || !Array.isArray(d.books)) return;
-
-    var books = [];
-    var seen = {};
-    d.books.forEach(function (b) {
-      if (!b) return;
-      var title = String(b.title || '').trim();
-      if (!title) return;
-      var id = String(b.id || title);
-      if (seen[id]) return;
-      seen[id] = 1;
-      books.push({
-        id: id,
-        title: title,
-        author: String(b.author || ''),
-        type: String(b.type || 'text'),
-        progress: Math.max(0, Math.min(100, Number(b.progress_pct) || 0)),
-        lastRead: b.last_read || null
-      });
-    });
-
-    var lib = loadLib();
-    lib.books = books;
-    lib.syncedAt = Number(d.at) || Date.now();
-    lib.source = 'bridge';
-    saveLib(lib);
-
-    if (typeof toast === 'function') toast('已从书库同步 ' + books.length + ' 本');
+    var n = applyPayload(e.data);
+    if (n < 0) return;
+    if (typeof toast === 'function') toast('已从书库同步 ' + n + ' 本');
     var src = e.source;
     setTimeout(function () {
       try { if (src && src !== window) src.close(); } catch (err) {}
@@ -123,5 +206,12 @@
 
   var app = document.getElementById('app');
   if (app) new MutationObserver(function () { enhance(); }).observe(app, { childList: true, subtree: true });
-  setTimeout(enhance, 500);
+
+  /* 首次 settings 可能在 library-link 之前就被 events.js 画完，load 后补一次渲染 */
+  function refreshAfterLoad() {
+    if (typeof render === 'function') render();
+    setTimeout(enhance, 60);
+  }
+  if (document.readyState === 'complete') setTimeout(refreshAfterLoad, 80);
+  else window.addEventListener('load', function () { setTimeout(refreshAfterLoad, 80); });
 })();
