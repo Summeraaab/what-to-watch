@@ -44,6 +44,8 @@ function detailHTML(it) {
       <ul class="mhooks">${(it.hooks || []).map(function (h) { return '<li>' + esc(h) + '</li>'; }).join('')}</ul>
       <div class="tagrow">${it.tags.map(function (t) { return '<span class="tag">' + esc(t) + '</span>'; }).join('')}</div>
 
+      ${creditsBlock(it)}
+
       ${simTitles ? '<div class="mlabel">气质相近</div><div class="simrow">' + simTitles + '</div>' : ''}
 
       <div class="mlabel">我记得这部</div>
@@ -66,18 +68,168 @@ function closeDetail() {
   document.getElementById('overlay').innerHTML = '';
 }
 
+/* ---------- 演职员 ---------- */
+function renderPeople(people) {
+  if (!people || !people.length) return '<p class="hint">暂时没有演职员数据。</p>';
+  const groups = [
+    ['导演', people.filter(function (p) { return p.role === '导演'; }).slice(0, 3)],
+    ['编剧', people.filter(function (p) { return p.role === '编剧'; }).slice(0, 3)],
+    ['演员', people.filter(function (p) { return p.role === '演员'; }).slice(0, 10)]
+  ];
+  const html = groups.map(function (g) {
+    if (!g[1].length) return '';
+    return `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 9px">
+      <span class="hint" style="margin:0;min-width:30px">${g[0]}</span>
+      ${g[1].map(function (p) {
+        return `<button class="sim" data-act="person" data-pid="${esc(p.id)}" data-role="${g[0]}" data-as="${esc(p.as)}" title="${esc(p.as || p.name)}">${esc(p.name)}</button>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+  return html + '<p class="hint" style="margin-top:2px">点人名看 TA 的资料、代表作和新作。</p>';
+}
+
+function creditsBlock(it) {
+  if (!TMDB.canCredits(it)) {
+    const label = it.type === '小说' ? '这本书' : it.type === '漫画' ? '这部漫画' : '这个栏目';
+    return '<div class="mlabel">演职员</div><p class="hint">' + label + '暂不包含演职员信息。</p>';
+  }
+  return '<div class="mlabel">演职员</div><div id="dcred">' +
+    (it._credits ? renderPeople(it._credits) : '<p class="hint">正在读取演职员…</p>') + '</div>';
+}
+
+function loadCredits(it) {
+  if (!TMDB.canCredits(it)) return;
+  if (it._credits) {
+    it.peopleIds = it._credits.map(function (p) { return String(p.id); });
+    return;
+  }
+  TMDB.credits(it).then(function (list) {
+    it.peopleIds = (list || []).map(function (p) { return String(p.id); });
+    const el = document.getElementById('dcred');
+    if (el && view.detail === it.id) el.innerHTML = renderPeople(list);
+  }).catch(function () {
+    const el = document.getElementById('dcred');
+    if (el && view.detail === it.id) el.innerHTML = '<p class="hint">演职员没取到，可能是网络或 TMDB 数据限制。</p>';
+  });
+}
+
+/* ---------- 人物卡 ---------- */
+function workButtons(works) {
+  return works.map(function (w) {
+    return `<button class="sim" data-act="open-work" data-media="${esc(w.media)}" data-tid="${esc(w.id)}">${esc(w.title)}${w.year ? ' · ' + w.year : ''}${w.vote ? ' · ★' + w.vote.toFixed(1) : ''}</button>`;
+  }).join('');
+}
+
+function latestWorks(p) {
+  const today = new Date().toISOString().slice(0, 10);
+  const up = p.works.filter(function (w) { return w.date && w.date > today; })
+    .sort(function (a, b) { return a.date.localeCompare(b.date); });
+  const recent = p.works.filter(function (w) { return w.date && w.date <= today; })
+    .sort(function (a, b) { return b.date.localeCompare(a.date); });
+  return (up.length ? up : recent).slice(0, 2).map(function (w) {
+    return { id: w.id, media: w.media, title: w.title, year: w.year, date: w.date };
+  });
+}
+
+function personHTML(p, meta) {
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = p.works.filter(function (w) { return w.date && w.date > today; })
+    .sort(function (a, b) { return a.date.localeCompare(b.date); }).slice(0, 4);
+  const recent = p.works.filter(function (w) { return w.date && w.date <= today; })
+    .sort(function (a, b) { return b.date.localeCompare(a.date); }).slice(0, 6);
+  const known = p.works.slice().sort(function (a, b) { return (b.vote * 10 + b.votes / 100) - (a.vote * 10 + a.votes / 100); }).slice(0, 8);
+  const on = !!(state.followed && state.followed[p.id]);
+  const avatar = p.profilePath
+    ? `<img class="poster" style="width:64px;height:64px;border-radius:50%;object-fit:cover;margin:0" src="${esc(TMDB.imgBase() + '/w185' + p.profilePath)}" alt="" referrerpolicy="no-referrer" data-ph="影">`
+    : `<div class="poster ph" style="width:64px;height:64px;border-radius:50%;margin:0;font-size:20px">${esc(p.name.slice(0, 1))}</div>`;
+  const bio = p.biography ? p.biography.slice(0, 240) + (p.biography.length > 240 ? '…' : '') : '暂无人物简介。';
+  return `<div class="scrim" data-act="person-close">
+    <div class="sheet" data-stop="1" style="max-height:88vh;overflow:auto">
+      <div class="grab"></div>
+      <div class="mtop">
+        <span class="badge">${esc(p.deptZh)}</span>
+        <span>${esc(p.name)}</span>
+        <button class="x" data-act="person-close">×</button>
+      </div>
+      <div style="display:flex;gap:14px;align-items:center;margin:16px 0 8px">
+        ${avatar}
+        <div style="min-width:0">
+          <h2 class="mtitle serif" style="margin:0 0 4px;font-size:24px">${esc(p.name)}</h2>
+          <div class="mmeta">${meta && meta.role ? '本片：' + esc(meta.role) + (meta.as ? ' · ' + esc(meta.as) : '') : esc(p.deptZh)}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin:10px 0 4px">
+        <button class="btn ${on ? 'primary' : ''}" data-act="follow-person" data-id="${esc(p.id)}" data-name="${esc(p.name)}" data-profile="${esc(p.profilePath)}" data-dept="${esc(p.deptZh)}">${on ? '已关注' : '关注 TA'}</button>
+        <span class="hint" style="margin:0">关注后，TA 的新作会优先出现</span>
+      </div>
+      <p class="msyn" style="margin-top:10px">${esc(bio)}</p>
+      ${upcoming.length ? '<div class="mlabel">即将推出</div><div class="simrow">' + workButtons(upcoming) + '</div>' : ''}
+      ${recent.length ? '<div class="mlabel">最近作品</div><div class="simrow">' + workButtons(recent) + '</div>' : ''}
+      ${known.length ? '<div class="mlabel">代表作</div><div class="simrow">' + workButtons(known) + '</div>' : '<p class="hint">暂无作品列表。</p>'}
+      <p class="hint">点作品直接看详情；资料来自 TMDB，中文简介可能不完整。</p>
+    </div>
+  </div>`;
+}
+
+async function openPersonSheet(pid, meta) {
+  if (!pid) return;
+  view.personFrom = view.detail;
+  view.person = String(pid);
+  const ov = document.getElementById('overlay');
+  ov.innerHTML = `<div class="scrim" data-act="person-close"><div class="sheet" data-stop="1">
+    <div class="grab"></div>
+    <div class="mtop"><span class="badge">人物</span><span>正在读取…</span><button class="x" data-act="person-close">×</button></div>
+    <div class="loading"><span class="spin"></span>正在取 TMDB 人物资料…</div>
+  </div></div>`;
+  try {
+    const p = await TMDB.person(pid);
+    if (view.person !== String(pid)) return;
+    ov.innerHTML = personHTML(p, meta || {});
+  } catch (e) {
+    if (view.person !== String(pid)) return;
+    ov.innerHTML = `<div class="scrim" data-act="person-close"><div class="sheet" data-stop="1">
+      <div class="grab"></div>
+      <div class="mtop"><span class="badge">人物</span><span>没读到资料</span><button class="x" data-act="person-close">×</button></div>
+      <p class="hint" style="margin:18px 0">${esc(e.message || '网络问题')}，稍后再试。</p>
+    </div></div>`;
+  }
+}
+
+function closePerson() {
+  const from = view.personFrom;
+  view.person = null;
+  view.personFrom = null;
+  document.getElementById('overlay').innerHTML = '';
+  if (from) openDetail(from);
+}
+
+async function openWork(media, tid) {
+  if (!media || !tid) return;
+  view.person = null;
+  view.personFrom = null;
+  toast('正在取作品详情…');
+  try {
+    const it = await TMDB.work(media, tid);
+    openDetail(it.id);
+  } catch (e) {
+    toast('没取到这部作品：' + (e.message || '网络问题'));
+  }
+}
+
 async function openDetail(id) {
   const it = getItem(id);
   if (!it) return;
   view.detail = id;
+  view.person = null;
   const ov = document.getElementById('overlay');
   ov.innerHTML = detailHTML(it) + '<div class="loading" id="dload" style="position:fixed;left:0;right:0;bottom:30px;z-index:99"><span class="spin"></span>正在取在线详情…</div>';
+  loadCredits(it);
   const load = document.getElementById('dload');
   if (it.src === 'tmdb' && !it.detailLoaded) {
     try {
       await TMDB.detail(it);
       if (load) load.remove();
-      if (view.detail === id) ov.innerHTML = detailHTML(it);
+      if (view.detail === id) { ov.innerHTML = detailHTML(it); loadCredits(it); }
       return;
     } catch (e) {
       if (load) load.remove();
