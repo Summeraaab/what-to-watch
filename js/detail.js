@@ -1,3 +1,10 @@
+function starRow(cur, id, big) {
+  const st = big ? 'min-width:44px;padding:8px 10px;font-size:22px' : 'min-width:34px;padding:5px 7px;font-size:15px';
+  return [1, 2, 3, 4, 5].map(function (n) {
+    return `<button class="rchip ${cur >= n ? 'on' : ''}" data-act="rate" data-id="${esc(id)}" data-val="${n}" title="${n} 星" aria-label="${n} 星" style="line-height:1;${st}">★</button>`;
+  }).join('');
+}
+
 function detailHTML(it) {
   const prof = buildProfile();
   const s = scoreItem(it, prof);
@@ -41,14 +48,15 @@ function detailHTML(it) {
 
       <div class="mlabel">我记得这部</div>
       <div class="rate">
-        <span class="rl">看过了：</span>
-        ${[[5, '很喜欢'], [3, '还不错'], [1, '不太喜欢']].map(function (o) {
-          return `<button class="rchip ${cur === o[0] ? 'on' : ''}" data-act="rate" data-id="${esc(it.id)}" data-val="${o[0]}">${o[1]}</button>`;
-        }).join('')}
+        <span class="rl">打几星：</span>
+        ${starRow(cur, it.id, true)}
+        ${cur ? `<button class="ghost-btn" data-act="rate-clear" data-id="${esc(it.id)}" style="font-size:11.5px">清除</button>` : ''}
+      </div>
+      <p class="hint" style="margin-top:6px">1 星很不喜欢，5 星很喜欢；打分会直接修正口味画像。${it.src === 'tmdb' ? '在线条目只保存 ID，不占空间。' : ''}</p>
+      <div class="rate" style="margin-top:10px">
         <button class="btn ${state.interested[it.id] ? 'primary' : ''}" data-act="want" data-id="${esc(it.id)}">${state.interested[it.id] ? '已标感兴趣' : '感兴趣'}</button>
         <button class="btn" data-act="dislike" data-id="${esc(it.id)}" style="margin-left:auto">不感兴趣</button>
       </div>
-      <p class="hint">标记后这部作品会从推荐池里移出，口味画像同步更新。${it.src === 'tmdb' ? '在线条目只保存 ID，不占空间。' : ''}</p>
     </div>
   </div>`;
 }
@@ -80,25 +88,47 @@ async function openDetail(id) {
   if (load) load.remove();
 }
 
+/* ---------- 打分小窗（点「看过了」时弹出） ---------- */
+function openRateSheet(id) {
+  const it = getItem(id);
+  if (!it) return;
+  const cur = state.ratings[id] || 0;
+  const ov = document.getElementById('overlay');
+  ov.innerHTML = `<div class="scrim" data-act="rate-close">
+    <div class="sheet" data-stop="1">
+      <div class="grab"></div>
+      <div class="mtop">
+        <span class="badge">${esc(it.type)}</span>
+        <span>${esc(it.title)}</span>
+        <button class="x" data-act="rate-close">×</button>
+      </div>
+      <p class="hint" style="margin:12px 0 2px">看完了就给这部打个星：1 星很不喜欢，5 星很喜欢。打分会直接修正口味画像。</p>
+      <div class="rate" style="justify-content:center;margin:18px 0 22px">${starRow(cur, it.id, true)}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <button class="ghost-btn" data-act="rate-close">先不打</button>
+        <span class="hint" style="margin:0">${cur ? '当前 ' + cur + ' 星' : '还没评过'}</span>
+      </div>
+    </div>
+  </div>`;
+}
+
 /* ---------- 冷启动 ---------- */
 function renderOnboard() {
   const items = SEEDS.map(getItem).filter(Boolean);
   const rows = items.map(function (it) {
-    const cur = state.ratings[it.id];
+    const cur = state.ratings[it.id] || 0;
+    const stars = [1, 2, 3, 4, 5].map(function (n) {
+      return `<button class="ob ${cur >= n ? 'on' : ''}" data-act="ob" data-id="${esc(it.id)}" data-val="${n}" title="${n} 星" aria-label="${n} 星" style="padding:7px 0">★</button>`;
+    }).join('');
     return `<div class="obrow">
       <div class="oh"><span class="ot serif">${esc(it.title)}</span><span class="om">${esc(it.type)} · ${esc(it.region)} · ${esc(it.year)}</span></div>
-      <div class="obtns">
-        ${[[5, '很喜欢'], [3, '还不错'], [1, '不太喜欢'], [0, '没看过']].map(function (o) {
-          const on = o[0] !== 0 && cur == o[0];
-          return `<button class="ob ${on ? 'on' : ''}" data-act="ob" data-id="${esc(it.id)}" data-val="${o[0]}">${o[1]}</button>`;
-        }).join('')}
-      </div></div>`;
+      <div class="obtns">${stars}<button class="ob ${cur ? '' : 'on'}" data-act="ob" data-id="${esc(it.id)}" data-val="0" style="flex:1.5">没看过</button></div></div>`;
   }).join('');
   const marked = items.filter(function (it) { return state.ratings[it.id]; }).length;
   return `<div class="onb"><div class="onbin">
     <div class="kicker" style="margin-bottom:8px">COLD START · 30 秒</div>
     <h2 class="serif">先告诉我你看过什么</h2>
-    <p>下面 12 部是不同方向上的代表作。看过的打个标记，喜欢的点「很喜欢」，没看过就跳过。</p>
+    <p>下面 12 部是不同方向上的代表作。看过的打个星，5 星是很喜欢，1 星是很不喜欢，没看过就跳过。</p>
     <p style="color:var(--dim2);font-size:12px">不用全填，标 4–5 部就能形成初步画像。</p>
     <div style="margin-top:18px">${rows}</div>
   </div>
