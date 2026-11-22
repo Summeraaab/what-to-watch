@@ -15,6 +15,18 @@ const aiCache = {};
 let aiError = '';
 let tmdbTried = false;
 
+/* 海报加载失败时退回占位块，避免卡片出现破图 */
+document.addEventListener('error', function (e) {
+  const el = e.target;
+  if (!el || el.tagName !== 'IMG' || !el.classList || !el.classList.contains('poster')) return;
+  if (el.getAttribute('data-drop') === '1') { if (el.parentNode) el.parentNode.removeChild(el); return; }
+  const ph = document.createElement('div');
+  ph.className = 'poster ph';
+  ph.textContent = el.getAttribute('data-ph') || '暂无海报';
+  ph.style.cssText = el.style.cssText;
+  if (el.parentNode) el.parentNode.replaceChild(ph, el);
+}, true);
+
 function $(s, el) { return (el || document).querySelector(s); }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]); }); }
 
@@ -66,8 +78,8 @@ function cardHTML(x, prof) {
   const pct = pctOf(s, prof);
   const poster = it.src === 'tmdb' ? TMDB.poster(it, 'w185') : '';
   const media = poster
-    ? '<img class="poster" src="' + esc(poster) + '" alt="" loading="lazy" referrerpolicy="no-referrer">'
-    : '';
+    ? '<img class="poster" src="' + esc(poster) + '" alt="" loading="lazy" referrerpolicy="no-referrer" data-ph="' + esc(it.type) + '">'
+    : '<div class="poster ph">' + esc(it.type) + '</div>';
   return `
   <article class="card">
     <div class="ctop">
