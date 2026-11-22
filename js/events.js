@@ -70,6 +70,45 @@ document.addEventListener('click', function (e) {
   if (act === 'refresh') { view.seed++; view.exclude = view.exclude.concat(view.shown); view.shown = []; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
   if (act === 'open') { openDetail(id); return; }
   if (act === 'jump') { openDetail(id); return; }
+  if (act === 'person') { openPersonSheet(el.getAttribute('data-pid') || id, { role: el.getAttribute('data-role'), as: el.getAttribute('data-as') }); return; }
+  if (act === 'person-close') { if (e.target.closest('.sheet') && !e.target.closest('.x')) return; closePerson(); return; }
+  if (act === 'open-work') { openWork(el.getAttribute('data-media'), el.getAttribute('data-tid')); return; }
+  if (act === 'follow-person') {
+    if (state.followed[id]) {
+      delete state.followed[id];
+      saveState();
+      el.textContent = '关注 TA';
+      el.classList.remove('primary');
+      toast('已取消关注');
+      return;
+    }
+    state.followed[id] = {
+      name: el.getAttribute('data-name') || '未命名',
+      profilePath: el.getAttribute('data-profile') || '',
+      dept: el.getAttribute('data-dept') || '影视人',
+      latest: [], at: Date.now()
+    };
+    saveState();
+    el.textContent = '已关注';
+    el.classList.add('primary');
+    toast('已关注，新作会优先出现');
+    TMDB.person(id).then(function (p) {
+      if (!state.followed[id]) return;
+      state.followed[id].latest = latestWorks(p);
+      /* 把 TA 参与的在库条目打上标记，下一轮推荐会直接加权 */
+      allItems().forEach(function (it) {
+        const ent = TMDB.entryOf(it);
+        if (!ent) return;
+        const inWork = p.works.some(function (w) { return w.id === ent.id && w.media === ent.media; });
+        if (!inWork) return;
+        it.peopleIds = it.peopleIds || [];
+        if (it.peopleIds.indexOf(String(id)) < 0) it.peopleIds.push(String(id));
+      });
+      saveState();
+    }).catch(function () { /* 人物资料失败也保留关注 */ });
+    return;
+  }
+  if (act === 'unfollow') { delete state.followed[id]; saveState(); render(); toast('已取消关注'); return; }
   if (act === 'close') { if (e.target.closest('.sheet') && !e.target.closest('.x')) return; closeDetail(); return; }
   if (act === 'seen') { openRateSheet(id); return; }
   if (act === 'rate') {

@@ -5,10 +5,10 @@ const SEEDS = ['s1', 'a1', 'a3', 'a4', 'n1', 'n2', 'm2', 'm1', 'm6', 'v4', 'v1',
 
 const view = {
   tab: 'home', time: 'any', type: '全部', q: '', source: 'all',
-  shown: [], exclude: [], seed: 0, detail: null, settings: false
+  shown: [], exclude: [], seed: 0, detail: null, person: null, personFrom: null, settings: false
 };
 
-const HASH_TAB = { '#home': 'home', '#library': 'library', '#profile': 'profile', '#settings': 'settings' };
+const HASH_TAB = { '#home': 'home', '#library': 'library', '#insight': 'insight', '#profile': 'profile', '#settings': 'settings' };
 if (location.hash && HASH_TAB[location.hash]) view.tab = HASH_TAB[location.hash];
 
 const aiCache = {};
@@ -127,6 +127,37 @@ function sourceBar() {
     <button class="btn sm" data-act="tmdb-retry">刷新</button></div>`;
 }
 
+function followFeedHTML() {
+  const list = [], seen = {};
+  Object.keys(state.followed || {}).forEach(function (fid) {
+    const f = state.followed[fid];
+    (f.latest || []).forEach(function (w) {
+      const key = 'tmdb-' + w.media + '-' + w.id;
+      if (seen[key] || state.ratings[key] || state.disliked[key]) return;
+      /* 内置条目和 TMDB 条目可能同一部作品，按媒体+id 去重，避免把已看过的又推一遍 */
+      const seenLocal = allItems().some(function (it) {
+        const ent = TMDB.entryOf(it);
+        return ent && ent.media === w.media && ent.id === w.id && (state.ratings[it.id] || state.disliked[it.id]);
+      });
+      if (seenLocal) return;
+      seen[key] = 1;
+      list.push({ key: key, w: w, f: f });
+    });
+  });
+  if (!list.length) return '';
+  list.sort(function (a, b) { return (b.w.date || '').localeCompare(a.w.date || ''); });
+  const today = new Date().toISOString().slice(0, 10);
+  const cutoff = new Date(Date.now() - 2 * 365 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const recent = list.filter(function (x) { return x.w.date && x.w.date >= cutoff; });
+  if (!recent.length) return '';
+  return `<div class="panel"><h4>关注的人 · 新作</h4>
+    <div class="simrow">${recent.slice(0, 4).map(function (x) {
+      const soon = x.w.date && x.w.date > today ? '即将 · ' : '';
+      return `<button class="sim" data-act="open-work" data-media="${esc(x.w.media)}" data-tid="${esc(x.w.id)}">${soon}${esc(x.f.name)} · ${esc(x.w.title)}${x.w.year ? ' · ' + x.w.year : ''}</button>`;
+    }).join('')}</div>
+    <p class="hint">你关注的人有新作品或最近作品时，会先摆在这里。</p></div>`;
+}
+
 function renderHome() {
   const prof = buildProfile();
   const pool = poolHome();
@@ -150,13 +181,14 @@ function renderHome() {
     <p class="lede">电影、剧集、番剧、综艺、小说、ACG 与博主栏目。先看你有多少时间，再说清为什么是这一部。</p>
   </section>
   ${sourceBar()}
+  ${followFeedHTML()}
   <div class="rowlabel">现在有多少时间</div>
   <div class="chips">${timeChips}</div>
   <div class="rowlabel">今天想看什么</div>
   <div class="chips wrap">${typeChips}</div>
   <div class="sec"><h2>为你挑的</h2><button class="ghost-btn" data-act="refresh">换一批 ↻</button></div>
   ${body}
-  <p class="hint">点「感兴趣」会收进想看清单，之后不再重复推给你；点「看过了」会更新口味画像；点「不感兴趣」会让同类内容降权。记录只存在这台设备上。</p>`;
+  <p class="hint">点「感兴趣」会收进想看清单，之后不再重复推给你；点「看过了」会给这部打 1–5 星，评分直接更新口味画像；点「不感兴趣」会让同类内容降权。记录只存在这台设备上。</p>`;
 }
 
 /* ---------- 片库 ---------- */
