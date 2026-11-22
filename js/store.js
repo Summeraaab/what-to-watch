@@ -2,8 +2,9 @@
    - 顶层带 v（schema 版本）、updatedAt（最后修改时间）
    - 只存纯 JSON，方便未来整体推送到云端
 */
-const APP_VERSION = '1.0.12';
+const APP_VERSION = '1.0.13';
 const STORE_KEY = 'watchnext_state_v1';
+const WATCH_META_KEY = 'watchnext_watch_meta_v1';
 
 const DEFAULT_SETTINGS = {
   tmdb: { key: '3b7ae078f0c27db48a992487c0f006ad', base: 'https://api.tmdb.org/3', img: 'https://image.tmdb.org/t/p' },
@@ -66,6 +67,33 @@ function saveState() {
   } catch (e) {
     /* 隐私模式或空间不足时静默失败，功能仍可用 */
   }
+  rememberWatchMeta();
+}
+
+/* 给开屏留一份「看过的作品」海报快照：在线条目的海报下次冷启动也能直接用 */
+function rememberWatchMeta() {
+  if (typeof state === 'undefined' || !state.ratings) return;
+  var old = {};
+  try { old = JSON.parse(localStorage.getItem(WATCH_META_KEY) || '{}'); } catch (e) { old = {}; }
+  var next = {};
+  Object.keys(state.ratings).forEach(function (id) {
+    var it = (typeof getItem === 'function') ? getItem(id) : null;
+    var base = old[id] || {};
+    var title = (it && it.title) || base.title || '';
+    var posterPath = (it && it.posterPath) || base.posterPath || '';
+    if (!title && !posterPath) return;
+    next[id] = {
+      title: title,
+      type: (it && it.type) || base.type || '',
+      year: (it && it.year) || base.year || 0,
+      src: (it && it.src) || base.src || '',
+      posterPath: posterPath,
+      media: (it && it.media) || base.media || '',
+      tmdbId: (it && it.tmdbId) || base.tmdbId || 0,
+      at: Date.now()
+    };
+  });
+  try { localStorage.setItem(WATCH_META_KEY, JSON.stringify(next)); } catch (e) { }
 }
 
 /* 感兴趣：加入/移出「想看清单」。看了就清掉，避免两个状态打架 */
