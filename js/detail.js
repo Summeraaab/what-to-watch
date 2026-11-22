@@ -43,6 +43,7 @@ function detailHTML(it) {
         ${[[5, '很喜欢'], [3, '还不错'], [1, '不太喜欢']].map(function (o) {
           return `<button class="rchip ${cur === o[0] ? 'on' : ''}" data-act="rate" data-id="${esc(it.id)}" data-val="${o[0]}">${o[1]}</button>`;
         }).join('')}
+        <button class="btn ${state.interested[it.id] ? 'primary' : ''}" data-act="want" data-id="${esc(it.id)}">${state.interested[it.id] ? '已标感兴趣' : '感兴趣'}</button>
         <button class="btn" data-act="dislike" data-id="${esc(it.id)}" style="margin-left:auto">不感兴趣</button>
       </div>
       <p class="hint">标记后这部作品会从推荐池里移出，口味画像同步更新。${it.src === 'tmdb' ? '在线条目只保存 ID，不占空间。' : ''}</p>

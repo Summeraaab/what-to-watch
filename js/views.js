@@ -21,7 +21,7 @@ function renderLibrary() {
     return `<div class="lrow" data-act="open" data-id="${esc(it.id)}">
       <div class="lt"><div class="n">${esc(it.title)}</div>
       <div class="m">${esc(it.type)} · ${esc(shortMeta(it))} · ${esc(it.tags.slice(0, 2).join(' / '))}${it.src === 'tmdb' ? ' · 在线' : ''}</div></div>
-      ${rated ? '<span class="seen">看过</span>' : '<span class="pct">' + pct + '%</span>'}
+      ${rated ? '<span class="seen">看过</span>' : state.interested[it.id] ? '<span class="seen">想看</span>' : '<span class="pct">' + pct + '%</span>'}
     </div>`;
   }).join('');
   const chips = TYPES.map(function (t) {
@@ -57,6 +57,9 @@ function renderProfile() {
   const rated = Object.keys(state.ratings).map(getItem).filter(Boolean)
     .sort(function (a, b) { return (state.ratings[b.id] || 0) - (state.ratings[a.id] || 0); });
   const disliked = Object.keys(state.disliked).map(getItem).filter(Boolean);
+  const wanted = Object.keys(state.interested).map(getItem).filter(Boolean)
+    .filter(function (it) { return !state.ratings[it.id]; })
+    .sort(function (a, b) { return (state.interested[b.id] || 0) - (state.interested[a.id] || 0); });
 
   const tagBars = tags.length ? tags.map(function (p) {
     return `<div class="barrow"><span class="lbl">${esc(p[0])}</span><span class="bar"><i style="width:${Math.max(6, Math.round(p[1] / maxTag * 100))}%"></i></span><span class="v">${Math.round(p[1] * 100)}</span></div>`;
@@ -72,24 +75,31 @@ function renderProfile() {
       }).join('')}</div>`;
   }).join('') : '<p class="hint">还没有标记过作品。</p>';
 
+  const wantRows = wanted.length ? wanted.map(function (it) {
+    return `<div class="seenrow"><span class="t">${esc(it.title)}</span>
+      <button class="rchip" data-act="seen" data-id="${esc(it.id)}">看过了</button>
+      <button class="rchip" data-act="want" data-id="${esc(it.id)}">移除</button></div>`;
+  }).join('') : '<p class="hint">还没有想看清单。首页卡片上点「感兴趣」就会进到这里。</p>';
+
   return `
-  <div class="top"><div class="brand"><span class="dot"></span>我的口味</div><div class="cnt">${prof.n} 部已标记</div></div>
+  <div class="top"><div class="brand"><span class="dot"></span>我的口味</div><div class="cnt">${rated.length} 部已看 · ${wanted.length} 部想看</div></div>
   <section class="hero" style="padding-bottom:14px">
     <h1 class="serif" style="font-size:30px">你的口味画像</h1>
     <p class="lede">推荐不是玄学：它来自你标记过的每一部作品，以及这些作品共有的标签、情绪和气质。</p>
   </section>
-  <div class="panel"><h4>看过并标记</h4>
+  <div class="panel"><h4>状态概览</h4>
     <div class="stat">
-      <div><b>${prof.n}</b><span>部作品</span></div>
+      <div><b>${rated.length}</b><span>部看过</span></div>
       <div><b>${Object.keys(state.ratings).filter(function (k) { return state.ratings[k] === 5; }).length}</b><span>部很喜欢</span></div>
-      <div><b>${disliked.length}</b><span>条负反馈</span></div>
+      <div><b>${wanted.length}</b><span>部想看</span></div>
     </div>
   </div>
   <div class="panel"><h4>你偏爱的标签</h4>${tagBars}
     ${moods.length ? '<h4 style="margin-top:16px">你偏爱的情绪</h4>' + moodBars : ''}
   </div>
   <div class="panel"><h4>看过的作品</h4>${seenRows}<p class="hint">换评分会立刻改变推荐顺序。</p></div>
-  <div class="panel"><h4>负反馈</h4>
+  <div class="panel"><h4>想看清单 · ${wanted.length}</h4>${wantRows}<p class="hint">「感兴趣」是比评分更轻的正向信号；进了清单的不会再出现在推荐里。</p></div>
+  <div class="panel"><h4>负反馈 · ${disliked.length}</h4>
     ${disliked.length ? disliked.map(function (it) { return `<div class="seenrow"><span class="t">${esc(it.title)}</span><button class="rchip" data-act="undislike" data-id="${esc(it.id)}">撤销</button></div>`; }).join('') : '<p class="hint">还没有拉黑任何一部。</p>'}
   </div>
   <div class="panel" data-act="go-settings" style="cursor:pointer">
