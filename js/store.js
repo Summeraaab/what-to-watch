@@ -2,7 +2,7 @@
    - 顶层带 v（schema 版本）、updatedAt（最后修改时间）
    - 只存纯 JSON，方便未来整体推送到云端
 */
-const APP_VERSION = '1.0.5';
+const APP_VERSION = '1.0.6';
 const STORE_KEY = 'watchnext_state_v1';
 
 const DEFAULT_SETTINGS = {
@@ -19,6 +19,7 @@ function defaultState() {
     disliked: {},     // id -> true
     interested: {},   // id -> 标「感兴趣」的时间戳（想看清单）
     seenAt: {},       // id -> timestamp
+    followed: {},     // 人物 id -> { name, profilePath, dept, latest, at }
     settings: clone(DEFAULT_SETTINGS),
     onboarded: false,
     createdAt: Date.now(),
@@ -33,6 +34,7 @@ function mergeState(raw) {
   s.disliked = raw.disliked && typeof raw.disliked === 'object' ? raw.disliked : {};
   s.interested = raw.interested && typeof raw.interested === 'object' ? raw.interested : {};
   s.seenAt = raw.seenAt && typeof raw.seenAt === 'object' ? raw.seenAt : {};
+  s.followed = raw.followed && typeof raw.followed === 'object' ? raw.followed : {};
   s.onboarded = !!raw.onboarded;
   s.createdAt = raw.createdAt || Date.now();
   s.updatedAt = raw.updatedAt || 0;
