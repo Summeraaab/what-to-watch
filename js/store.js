@@ -2,11 +2,11 @@
    - 顶层带 v（schema 版本）、updatedAt（最后修改时间）
    - 只存纯 JSON，方便未来整体推送到云端
 */
-const APP_VERSION = '1.0.2';
+const APP_VERSION = '1.0.3';
 const STORE_KEY = 'watchnext_state_v1';
 
 const DEFAULT_SETTINGS = {
-  tmdb: { key: '', base: 'https://api.themoviedb.org/3', img: 'https://image.tmdb.org/t/p' },
+  tmdb: { key: '3b7ae078f0c27db48a992487c0f006ad', base: 'https://api.tmdb.org/3', img: 'https://image.tmdb.org/t/p' },
   ai: { enabled: false, baseUrl: 'https://api.openai.com/v1', key: '', model: 'gpt-4o-mini' }
 };
 
@@ -38,6 +38,9 @@ function mergeState(raw) {
   s.updatedAt = raw.updatedAt || 0;
   const st = raw.settings || {};
   s.settings.tmdb = Object.assign({}, DEFAULT_SETTINGS.tmdb, st.tmdb || {});
+  if (!s.settings.tmdb.key) s.settings.tmdb.key = DEFAULT_SETTINGS.tmdb.key;
+  const tb = (s.settings.tmdb.base || '').replace(/\/+$/, '');
+  if (!tb || tb === 'https://api.themoviedb.org/3') s.settings.tmdb.base = DEFAULT_SETTINGS.tmdb.base;
   s.settings.ai = Object.assign({}, DEFAULT_SETTINGS.ai, st.ai || {});
   return s;
 }
