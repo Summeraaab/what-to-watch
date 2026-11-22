@@ -124,6 +124,10 @@
   }
   function showTypo(item) {
     clearTimeout(slowTimer);
+    if (poster && poster.classList.contains('loaded')) {
+      if (typo) typo.classList.remove('show');
+      return;
+    }
     if (poster) poster.style.display = 'none';
     if (!typo || !typoTitle) { return later(1200); }
     typoTitle.textContent = (item && item.title) || '闻刊';
@@ -137,7 +141,7 @@
   }
   function ready() {
     clearTimeout(slowTimer);
-    if (poster) poster.classList.add('loaded');
+    if (poster) { poster.classList.add('loaded'); poster.style.display = 'block'; }
     if (typo) typo.classList.remove('show');
     clearTimeout(maxTimer);
     later(1100);
@@ -146,6 +150,7 @@
     if (!url) { showTypo(item); return; }
     if (!poster) { showTypo(item); return; }
     if (typo) typo.classList.remove('show');
+    poster.classList.remove('loaded');
     poster.style.display = 'block';
     poster.onload = ready;
     poster.onerror = function () { showTypo(item); };
