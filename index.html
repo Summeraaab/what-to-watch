@@ -19,10 +19,18 @@
 <style>
 #splash{position:fixed;inset:0;z-index:9999;background:#050506;display:flex;align-items:center;justify-content:center;overflow:hidden;transition:opacity .55s ease;opacity:1}
 #splash.hide{opacity:0;pointer-events:none}
-#splash .sp-bg{position:absolute;inset:-40px;background:url('https://aka.doubaocdn.com/l/no8Pbi1icf') center/cover;filter:blur(48px) brightness(.28) saturate(.8);transform:scale(1.08);opacity:.45}
+#splash .sp-bg{position:absolute;inset:-40px;background:#050506;filter:blur(48px) brightness(.28) saturate(.8);transform:scale(1.08);opacity:.45}
 #splash .sp-vignette{position:absolute;inset:0;background:radial-gradient(70% 70% at 50% 40%,transparent,rgba(5,5,6,.6) 68%,#050506 100%)}
 #splash .sp-poster{position:relative;width:min(82vw,430px);max-height:69vh;object-fit:contain;border-radius:14px;box-shadow:0 30px 90px rgba(0,0,0,.8);opacity:0;transform:scale(.96) translateY(10px);transition:opacity .8s ease,transform .9s cubic-bezier(.2,.8,.2,1);z-index:1}
 #splash .sp-poster.loaded{opacity:1;transform:none}
+#splash .sp-typo{position:relative;width:min(82vw,430px);aspect-ratio:2/3;max-height:69vh;z-index:1;display:flex;flex-direction:column;justify-content:space-between;padding:clamp(18px,5vw,30px);box-sizing:border-box;border-radius:14px;border:1px solid rgba(231,183,106,.22);background:radial-gradient(120% 90% at 50% 15%,rgba(231,183,106,.12),transparent 55%),linear-gradient(155deg,#1a1920 0%,#0c0c10 58%,#211a12 100%);box-shadow:0 30px 90px rgba(0,0,0,.8);opacity:0;transform:scale(.96) translateY(10px);transition:opacity .8s ease,transform .9s cubic-bezier(.2,.8,.2,1);overflow:hidden}
+#splash .sp-typo.show{opacity:1;transform:none}
+#splash .sp-typo::after{content:'';position:absolute;left:0;right:0;bottom:0;height:38%;background:linear-gradient(transparent,rgba(0,0,0,.45));pointer-events:none}
+#splash .sp-typo-kicker{position:relative;z-index:1;font-size:9px;letter-spacing:.26em;color:rgba(231,183,106,.72);text-transform:uppercase}
+#splash .sp-typo-title{position:relative;z-index:1;margin:auto 0;font-size:clamp(25px,7.2vw,40px);line-height:1.24;letter-spacing:.03em;color:#f1e7d3;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;text-shadow:0 4px 24px rgba(0,0,0,.5)}
+#splash .sp-typo-meta{position:relative;z-index:1;font-size:10.5px;letter-spacing:.1em;color:rgba(255,255,255,.48)}
+#splash .sp-typo-rule{position:relative;z-index:1;width:42px;height:1px;background:rgba(231,183,106,.55);margin:14px 0 10px}
+#splash .sp-typo-foot{position:relative;z-index:1;font-size:9px;letter-spacing:.18em;color:rgba(255,255,255,.32)}
 #splash .sp-copy{position:absolute;left:0;right:0;bottom:calc(24px + env(safe-area-inset-bottom));text-align:center;z-index:2}
 #splash .sp-kicker{font-size:9px;letter-spacing:.28em;color:rgba(255,255,255,.45);text-transform:uppercase}
 #splash .sp-brand{margin:8px 0 4px;font-family:'Noto Serif SC',serif;font-size:34px;color:#e7b76a;letter-spacing:.18em;text-indent:.18em}
@@ -30,14 +38,23 @@
 #splash .sp-bar{position:absolute;left:50%;bottom:calc(80px + env(safe-area-inset-bottom));width:54px;height:1px;background:rgba(255,255,255,.14);transform:translateX(-50%);overflow:hidden;z-index:2}
 #splash .sp-bar i{display:block;width:100%;height:100%;background:#e7b76a;transform-origin:left;animation:spload 1.6s ease-in-out infinite}
 @keyframes spload{0%{transform:scaleX(0)}60%{transform:scaleX(1)}100%{transform:scaleX(1)}}
-@media (prefers-reduced-motion: reduce){#splash .sp-poster{transition:none}#splash .sp-bar{display:none}}
+@media (prefers-reduced-motion: reduce){#splash .sp-poster,#splash .sp-typo{transition:none}#splash .sp-bar{display:none}}
 </style>
 </head>
 <body>
 <div id="splash" aria-hidden="true">
   <div class="sp-bg"></div>
   <div class="sp-vignette"></div>
-  <img class="sp-poster" src="https://aka.doubaocdn.com/l/no8Pbi1icf" alt="" referrerpolicy="no-referrer">
+  <img class="sp-poster" alt="" referrerpolicy="no-referrer">
+  <div class="sp-typo" id="spTypo">
+    <div class="sp-typo-kicker">FROM YOUR WATCHED</div>
+    <div class="sp-typo-title serif" id="spTypoTitle"></div>
+    <div>
+      <div class="sp-typo-meta" id="spTypoMeta"></div>
+      <div class="sp-typo-rule"></div>
+      <div class="sp-typo-foot">闻刊 · 今晚，看点好的</div>
+    </div>
+  </div>
   <div class="sp-bar"><i></i></div>
   <div class="sp-copy">
     <div class="sp-kicker">A PERSONAL SCREENING ROOM</div>
@@ -59,6 +76,7 @@
 <script src="./js/data-3.js"></script>
 <script src="./js/data.js"></script>
 <script src="./js/people-map.js"></script>
+<script src="./js/local-posters.js"></script>
 <script src="./js/store.js"></script>
 <script src="./js/engine.js"></script>
 <script src="./js/tmdb.js"></script>
@@ -75,30 +93,109 @@
   var s = document.getElementById('splash');
   if (!s) return;
   var poster = s.querySelector('.sp-poster');
+  var typo = document.getElementById('spTypo');
+  var typoTitle = document.getElementById('spTypoTitle');
+  var typoMeta = document.getElementById('spTypoMeta');
+  var bg = s.querySelector('.sp-bg');
   var done = false;
+  var hideTimer = null;
   var maxTimer = setTimeout(hide, 2800);
+  var FALLBACK = 'https://aka.doubaocdn.com/l/no8Pbi1icf';
+
   function hide() {
     if (done) return;
     done = true;
     clearTimeout(maxTimer);
+    clearTimeout(hideTimer);
     s.classList.add('hide');
     setTimeout(function () { if (s.parentNode) s.parentNode.removeChild(s); }, 700);
+  }
+  function later(ms) {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(hide, ms);
+  }
+  function readMeta() {
+    try { return JSON.parse(localStorage.getItem('watchnext_watch_meta_v1') || '{}'); } catch (e) { return {}; }
+  }
+  function writeMeta(m) {
+    try { localStorage.setItem('watchnext_watch_meta_v1', JSON.stringify(m)); } catch (e) { }
+  }
+  function showTypo(item) {
+    if (poster) poster.style.display = 'none';
+    if (!typo || !typoTitle) { return later(1200); }
+    typoTitle.textContent = (item && item.title) || '闻刊';
+    var bits = [];
+    if (item && item.type) bits.push(item.type);
+    if (item && item.year) bits.push(item.year);
+    typoMeta.textContent = bits.join(' · ') || '私人放映室';
+    typo.classList.add('show');
+    if (bg) { bg.style.background = '#08080b'; bg.style.backgroundImage = 'none'; }
+    later(1500);
   }
   function ready() {
     if (poster) poster.classList.add('loaded');
     clearTimeout(maxTimer);
-    setTimeout(hide, 1100);
+    later(1100);
   }
-  if (poster) {
-    poster.addEventListener('load', ready);
-    poster.addEventListener('error', function () {
-      poster.style.display = 'none';
-      clearTimeout(maxTimer);
-      setTimeout(hide, 700);
-    });
+  function showImage(url, item) {
+    if (!url) { showTypo(item); return; }
+    if (!poster) { showTypo(item); return; }
+    if (typo) typo.classList.remove('show');
+    poster.style.display = 'block';
+    poster.onload = ready;
+    poster.onerror = function () { showTypo(item); };
+    poster.src = url;
+    if (bg) {
+      bg.style.backgroundImage = 'url("' + String(url).replace(/"/g, '%22') + '")';
+      bg.style.backgroundSize = 'cover';
+      bg.style.backgroundPosition = 'center';
+    }
     if (poster.complete && poster.naturalWidth) ready();
+  }
+  function tryTmdb(id, cb) {
+    var m = /^tmdb-(movie|tv)-(\d+)$/.exec(id);
+    if (!m || typeof TMDB === 'undefined' || !TMDB.api) { cb(''); return; }
+    var called = false;
+    var timer = setTimeout(function () { if (called) return; called = true; cb(''); }, 1300);
+    TMDB.api('/' + m[1] + '/' + m[2], {}).then(function (d) {
+      if (called) return; called = true; clearTimeout(timer);
+      var path = d && d.poster_path;
+      if (!path) { cb(''); return; }
+      var meta = readMeta();
+      meta[id] = meta[id] || {};
+      meta[id].posterPath = path;
+      meta[id].title = (d.title || d.name || meta[id].title || '');
+      meta[id].at = Date.now();
+      writeMeta(meta);
+      cb(TMDB.poster({ posterPath: path }, 'w780'));
+    }).catch(function () {
+      if (called) return; called = true; clearTimeout(timer); cb('');
+    });
+  }
+  function pick() {
+    var ids = (typeof state !== 'undefined' && state.ratings) ? Object.keys(state.ratings) : [];
+    if (!ids.length) return { id: '', title: '沙丘2', type: '电影', year: 2024, url: FALLBACK };
+    var id = ids[Math.floor(Math.random() * ids.length)];
+    var it = (typeof getItem === 'function') ? getItem(id) : null;
+    var meta = readMeta()[id] || {};
+    var title = (it && it.title) || meta.title || '看过的一部';
+    var type = (it && it.type) || meta.type || '电影';
+    var year = (it && it.year) || meta.year || '';
+    var path = (it && it.posterPath) || meta.posterPath || ((window.LOCAL_POSTERS || {})[id] || '');
+    var url = path && typeof TMDB !== 'undefined' ? TMDB.poster({ posterPath: path }, 'w780') : '';
+    return { id: id, title: title, type: type, year: year, url: url };
+  }
+
+  var sel = pick();
+  if (sel.url) {
+    showImage(sel.url, sel);
   } else {
-    setTimeout(hide, 1200);
+    showTypo(sel);
+    if (sel.id && /^tmdb-/.test(sel.id)) {
+      tryTmdb(sel.id, function (url) {
+        if (url && !done) showImage(url, sel);
+      });
+    }
   }
 })();
 </script>
