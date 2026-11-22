@@ -1,8 +1,8 @@
 /* Service Worker：把应用外壳缓存到本地，新版本自动接管 */
-const VERSION = '1.0.0';
+const VERSION = '1.0.1';
 const CACHE = 'watchnext-' + VERSION;
 const ASSETS = [
-  './', './index.html', './css/app.css',
+  './', './index.html', './css/app.css', './css/mobile.css',
   './js/data-1.js', './js/data-2.js', './js/data-3.js', './js/data.js',
   './js/store.js', './js/engine.js', './js/tmdb.js',
   './js/app.js', './js/views.js', './js/detail.js', './js/events.js',

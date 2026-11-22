@@ -1,0 +1,6 @@
+/* 移动端安全区适配：状态栏 / 刘海屏 / 底部手势条
+   仅在支持 env() 的设备生效；不支持时保留 app.css 的原值 */
+.shell{padding-top:env(safe-area-inset-top,0px)}
+.onbin{padding-top:calc(26px + env(safe-area-inset-top,0px))}
+.obf{padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+.toast{bottom:calc(96px + env(safe-area-inset-bottom,0px))}
