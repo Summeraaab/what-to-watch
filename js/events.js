@@ -71,8 +71,10 @@ document.addEventListener('click', function (e) {
   if (act === 'open') { openDetail(id); return; }
   if (act === 'jump') { openDetail(id); return; }
   if (act === 'close') { if (e.target.closest('.sheet') && !e.target.closest('.x')) return; closeDetail(); return; }
-  if (act === 'seen') { setRating(id, 3); view.shown = []; view.exclude = []; render(); toast('已按「还不错」记下，可在详情里改评分'); return; }
-  if (act === 'rate') { setRating(id, Number(val)); closeDetail(); view.shown = []; view.exclude = []; render(); toast('评分已更新'); return; }
+  if (act === 'seen') { openRateSheet(id); return; }
+  if (act === 'rate') { setRating(id, Number(val)); closeDetail(); view.shown = []; view.exclude = []; render(); toast('已打 ' + val + ' 星'); return; }
+  if (act === 'rate-clear') { delete state.ratings[id]; closeDetail(); view.shown = []; view.exclude = []; render(); toast('已清除评分'); return; }
+  if (act === 'rate-close') { if (e.target.closest('.sheet') && !e.target.closest('.x')) return; closeDetail(); return; }
   if (act === 'dislike') { setDislike(id); closeDetail(); view.shown = []; view.exclude = []; render(); toast('已减少同类推荐'); return; }
   if (act === 'want') {
     const on = toggleInterest(id);
@@ -92,7 +94,8 @@ document.addEventListener('click', function (e) {
     const row = el.closest('.obrow');
     if (row) row.querySelectorAll('.ob').forEach(function (b) {
       const bv = b.getAttribute('data-val');
-      b.classList.toggle('on', bv !== '0' && Number(bv) === state.ratings[id]);
+      const cur = state.ratings[id] || 0;
+      b.classList.toggle('on', bv === '0' ? cur === 0 : (cur > 0 && Number(bv) <= cur));
     });
     const pc = document.querySelector('.obf .pc');
     if (pc) {
@@ -243,6 +246,9 @@ if ('serviceWorker' in navigator) {
 render();
 if (TMDB.on() && !tmdbTried) {
   tmdbTried = true;
-  TMDB.load().then(function () { if (view.tab === 'home' || view.tab === 'library') render(); })
-    .catch(function (err) { TMDB.error = err.message; if (view.tab === 'home') render(); });
+  TMDB.load().then(function () {
+    /* 只在没有弹层时重绘，避免把用户正在看的详情/打分小窗顶掉 */
+    if ((view.tab === 'home' || view.tab === 'library') && !document.querySelector('#overlay .sheet')) render();
+  })
+    .catch(function (err) { TMDB.error = err.message; if (view.tab === 'home' && !document.querySelector('#overlay .sheet')) render(); });
 }
