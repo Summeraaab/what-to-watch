@@ -33,25 +33,27 @@ function setRating(id, v) {
   state.ratings[id] = v;
   state.seenAt[id] = Date.now();
   delete state.disliked[id];
+  delete state.interested[id];
   saveState();
 }
 function setDislike(id) {
   state.disliked[id] = true;
   delete state.ratings[id];
+  delete state.interested[id];
   saveState();
 }
 
 /* ---------- 首页 ---------- */
 function poolHome() {
   let pool = allItems().filter(function (it) {
-    return !state.ratings[it.id] && !state.disliked[it.id] && view.exclude.indexOf(it.id) < 0;
+    return !state.ratings[it.id] && !state.disliked[it.id] && !state.interested[it.id] && view.exclude.indexOf(it.id) < 0;
   });
   if (view.type !== '全部') pool = pool.filter(function (it) { return it.type === view.type; });
   pool = pool.filter(function (it) { return matchTime(it, view.time); });
   if (pool.length < 4) {
     view.exclude = [];
     pool = allItems().filter(function (it) {
-      return !state.ratings[it.id] && !state.disliked[it.id] &&
+      return !state.ratings[it.id] && !state.disliked[it.id] && !state.interested[it.id] &&
         (view.type === '全部' || it.type === view.type) && matchTime(it, view.time);
     });
   }
@@ -82,8 +84,9 @@ function cardHTML(x, prof) {
     </div>
     <p class="syn">${esc(it.synopsis)}</p>
     <ul class="hooks">${(it.hooks || []).slice(0, 2).map(function (h) { return '<li>' + esc(h) + '</li>'; }).join('')}</ul>
-    <div class="acts">
+    <div class="acts" style="flex-wrap:wrap">
       <button class="btn primary" data-act="open" data-id="${esc(it.id)}">看详情</button>
+      <button class="btn ${state.interested[it.id] ? 'primary' : ''}" data-act="want" data-id="${esc(it.id)}">${state.interested[it.id] ? '已标感兴趣' : '感兴趣'}</button>
       <button class="btn" data-act="seen" data-id="${esc(it.id)}">看过了</button>
       <button class="btn plain" data-act="dislike" data-id="${esc(it.id)}">不感兴趣</button>
     </div>
@@ -128,7 +131,7 @@ function renderHome() {
     return `<button class="chip ${view.time === p[0] ? 'on' : ''}" data-act="time" data-val="${p[0]}">${p[1]}</button>`;
   }).join('');
   return `
-  <div class="top"><div class="brand"><span class="dot"></span>今晚看什么</div><div class="cnt">${allItems().length} 部 · 已标记 ${prof.n}</div></div>
+  <div class="top"><div class="brand"><span class="dot"></span>今晚看什么</div><div class="cnt">已看 ${Object.keys(state.ratings).length} · 想看 ${Object.keys(state.interested).length}</div></div>
   <section class="hero">
     <div class="kicker">A PERSONAL SCREENING ROOM</div>
     <h1 class="serif">别挑，<br><span style="color:var(--acc);font-style:normal">让口味替你做决定</span></h1>
@@ -141,7 +144,7 @@ function renderHome() {
   <div class="chips wrap">${typeChips}</div>
   <div class="sec"><h2>为你挑的</h2><button class="ghost-btn" data-act="refresh">换一批 ↻</button></div>
   ${body}
-  <p class="hint">点「看过了」会更新口味画像；点「不感兴趣」会让同类内容降权。记录只存在这台设备上。</p>`;
+  <p class="hint">点「感兴趣」会收进想看清单，之后不再重复推给你；点「看过了」会更新口味画像；点「不感兴趣」会让同类内容降权。记录只存在这台设备上。</p>`;
 }
 
 /* ---------- 片库 ---------- */

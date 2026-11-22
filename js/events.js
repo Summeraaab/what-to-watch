@@ -74,6 +74,14 @@ document.addEventListener('click', function (e) {
   if (act === 'seen') { setRating(id, 3); view.shown = []; view.exclude = []; render(); toast('已按「还不错」记下，可在详情里改评分'); return; }
   if (act === 'rate') { setRating(id, Number(val)); closeDetail(); view.shown = []; view.exclude = []; render(); toast('评分已更新'); return; }
   if (act === 'dislike') { setDislike(id); closeDetail(); view.shown = []; view.exclude = []; render(); toast('已减少同类推荐'); return; }
+  if (act === 'want') {
+    const on = toggleInterest(id);
+    closeDetail();
+    view.shown = []; view.exclude = [];
+    render();
+    toast(on ? '已加入想看清单，之后不再重复推给你' : '已移出想看清单');
+    return;
+  }
   if (act === 'undislike') { delete state.disliked[id]; saveState(); render(); toast('已撤销'); return; }
   if (act === 'go-settings') { view.tab = 'settings'; history.replaceState(null, '', '#settings'); render(); window.scrollTo({ top: 0 }); return; }
   if (act === 'back-profile') { view.tab = 'profile'; history.replaceState(null, '', '#profile'); render(); return; }
