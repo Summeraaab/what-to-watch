@@ -102,7 +102,7 @@ function openRateSheet(id) {
         <span>${esc(it.title)}</span>
         <button class="x" data-act="rate-close">×</button>
       </div>
-      <p class="hint" style="margin:12px 0 2px">看完了就给这部打个星：1 星很不喜欢，5 星很喜欢。打分会直接修正口味画像。</p>
+      <p class="hint" style="margin:12px 0 2px">看完了就给这部打个星：1 星很不喜欢，5 星很喜欢。点已选的星可取消评分，打分会直接修正口味画像。</p>
       <div class="rate" style="justify-content:center;margin:18px 0 22px">${starRow(cur, it.id, true)}</div>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
         <button class="ghost-btn" data-act="rate-close">先不打</button>
@@ -150,6 +150,7 @@ function render() {
   const tabs = [
     ['home', '推荐', 'M3 12l9-8 9 8v8a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z'],
     ['library', '片库', 'M4 5h16M4 12h16M4 19h10'],
+    ['insight', '分析', 'M4 19V9M10 19V5M16 19v-7M22 19V3'],
     ['profile', '我的', 'M12 12a4 4 0 100-8 4 4 0 000 8zM4 20c0-3.5 3.6-5.5 8-5.5s8 2 8 5.5']
   ];
   const nav = `<div class="nav"><div class="navin">${tabs.map(function (t) {
@@ -159,6 +160,7 @@ function render() {
   const app = document.getElementById('app');
   if (view.tab === 'home') app.innerHTML = renderHome();
   else if (view.tab === 'library') app.innerHTML = renderLibrary();
+  else if (view.tab === 'insight') app.innerHTML = renderInsight();
   else if (view.tab === 'settings') app.innerHTML = renderSettings();
   else app.innerHTML = renderProfile();
   document.getElementById('overlay').innerHTML = '';

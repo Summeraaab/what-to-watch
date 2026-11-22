@@ -72,7 +72,25 @@ document.addEventListener('click', function (e) {
   if (act === 'jump') { openDetail(id); return; }
   if (act === 'close') { if (e.target.closest('.sheet') && !e.target.closest('.x')) return; closeDetail(); return; }
   if (act === 'seen') { openRateSheet(id); return; }
-  if (act === 'rate') { setRating(id, Number(val)); closeDetail(); view.shown = []; view.exclude = []; render(); toast('已打 ' + val + ' 星'); return; }
+  if (act === 'rate') {
+    const v = Number(val);
+    if (state.ratings[id] === v) {
+      delete state.ratings[id];
+      saveState();
+      closeDetail();
+      view.shown = []; view.exclude = [];
+      render();
+      toast('已取消评分');
+      return;
+    }
+    setRating(id, v);
+    closeDetail();
+    view.shown = []; view.exclude = [];
+    render();
+    toast('已打 ' + v + ' 星');
+    return;
+  }
+  if (act === 'unrate') { delete state.ratings[id]; saveState(); view.shown = []; view.exclude = []; render(); toast('已移出看过的作品，会重新参与推荐'); return; }
   if (act === 'rate-clear') { delete state.ratings[id]; closeDetail(); view.shown = []; view.exclude = []; render(); toast('已清除评分'); return; }
   if (act === 'rate-close') { if (e.target.closest('.sheet') && !e.target.closest('.x')) return; closeDetail(); return; }
   if (act === 'dislike') { setDislike(id); closeDetail(); view.shown = []; view.exclude = []; render(); toast('已减少同类推荐'); return; }
@@ -85,6 +103,8 @@ document.addEventListener('click', function (e) {
     return;
   }
   if (act === 'undislike') { delete state.disliked[id]; saveState(); render(); toast('已撤销'); return; }
+  if (act === 'tag-search') { view.tab = 'library'; view.q = val; history.replaceState(null, '', '#library'); render(); window.scrollTo({ top: 0 }); return; }
+  if (act === 'type-go') { view.tab = 'library'; view.type = val; view.q = ''; history.replaceState(null, '', '#library'); render(); window.scrollTo({ top: 0 }); return; }
   if (act === 'go-settings') { view.tab = 'settings'; history.replaceState(null, '', '#settings'); render(); window.scrollTo({ top: 0 }); return; }
   if (act === 'back-profile') { view.tab = 'profile'; history.replaceState(null, '', '#profile'); render(); return; }
   if (act === 'ob') {
