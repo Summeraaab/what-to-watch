@@ -2,7 +2,7 @@
    - 顶层带 v（schema 版本）、updatedAt（最后修改时间）
    - 只存纯 JSON，方便未来整体推送到云端
 */
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2';
 const STORE_KEY = 'watchnext_state_v1';
 
 const DEFAULT_SETTINGS = {
@@ -17,6 +17,7 @@ function defaultState() {
     v: 1,
     ratings: {},      // id -> 5(很喜欢) / 3(还不错) / 1(不太喜欢)
     disliked: {},     // id -> true
+    interested: {},   // id -> 标「感兴趣」的时间戳（想看清单）
     seenAt: {},       // id -> timestamp
     settings: clone(DEFAULT_SETTINGS),
     onboarded: false,
@@ -30,6 +31,7 @@ function mergeState(raw) {
   if (!raw || typeof raw !== 'object') return s;
   s.ratings = raw.ratings && typeof raw.ratings === 'object' ? raw.ratings : {};
   s.disliked = raw.disliked && typeof raw.disliked === 'object' ? raw.disliked : {};
+  s.interested = raw.interested && typeof raw.interested === 'object' ? raw.interested : {};
   s.seenAt = raw.seenAt && typeof raw.seenAt === 'object' ? raw.seenAt : {};
   s.onboarded = !!raw.onboarded;
   s.createdAt = raw.createdAt || Date.now();
@@ -59,6 +61,18 @@ function saveState() {
   } catch (e) {
     /* 隐私模式或空间不足时静默失败，功能仍可用 */
   }
+}
+
+/* 感兴趣：加入/移出「想看清单」。看了就清掉，避免两个状态打架 */
+function toggleInterest(id) {
+  if (state.interested[id]) {
+    delete state.interested[id];
+  } else {
+    state.interested[id] = Date.now();
+    delete state.disliked[id];
+  }
+  saveState();
+  return !!state.interested[id];
 }
 
 function exportState() {

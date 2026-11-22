@@ -27,11 +27,21 @@ function buildProfile() {
     it.tags.forEach(function (t) { tagW[t] = (tagW[t] || 0) - 0.55; });
     it.mood.forEach(function (t) { moodW[t] = (moodW[t] || 0) - 0.35; });
   });
+  /* 「感兴趣」= 弱正向信号：只加 0.4 权重，比「还不错」轻，避免没看过就过度收窄 */
+  const wantIds = Object.keys(state.interested).filter(function (id) { return !state.ratings[id]; });
+  wantIds.forEach(function (id) {
+    const it = getItem(id);
+    if (!it) return;
+    const w = 0.4;
+    it.tags.forEach(function (t) { tagW[t] = (tagW[t] || 0) + w; });
+    it.mood.forEach(function (t) { moodW[t] = (moodW[t] || 0) + w * 0.6; });
+    tagW['节奏·' + it.pace] = (tagW['节奏·' + it.pace] || 0) + w * 0.3;
+  });
   let mx = 0; Object.keys(tagW).forEach(function (k) { mx = Math.max(mx, tagW[k]); });
   if (mx > 0) Object.keys(tagW).forEach(function (k) { tagW[k] = tagW[k] / mx; });
   let mm = 0; Object.keys(moodW).forEach(function (k) { mm = Math.max(mm, moodW[k]); });
   if (mm > 0) Object.keys(moodW).forEach(function (k) { moodW[k] = moodW[k] / mm; });
-  return { tagW: tagW, moodW: moodW, liked: liked, seen: seen, n: Object.keys(state.ratings).length };
+  return { tagW: tagW, moodW: moodW, liked: liked, seen: seen, n: Object.keys(state.ratings).length + wantIds.length };
 }
 
 function overlapTags(a, b, limit) {
@@ -138,6 +148,7 @@ function basePool(opt) {
   return allItems().filter(function (it) {
     if (state.ratings[it.id]) return false;
     if (state.disliked[it.id]) return false;
+    if (state.interested[it.id]) return false;
     if (o.source && o.source !== 'all' && it.src !== o.source) return false;
     if (o.type && o.type !== '全部' && it.type !== o.type) return false;
     if (o.time && !matchTime(it, o.time)) return false;
