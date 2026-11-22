@@ -99,6 +99,7 @@
   var bg = s.querySelector('.sp-bg');
   var done = false;
   var hideTimer = null;
+  var slowTimer = null;
   var maxTimer = setTimeout(hide, 2800);
   var FALLBACK = 'https://aka.doubaocdn.com/l/no8Pbi1icf';
 
@@ -107,6 +108,7 @@
     done = true;
     clearTimeout(maxTimer);
     clearTimeout(hideTimer);
+    clearTimeout(slowTimer);
     s.classList.add('hide');
     setTimeout(function () { if (s.parentNode) s.parentNode.removeChild(s); }, 700);
   }
@@ -121,6 +123,7 @@
     try { localStorage.setItem('watchnext_watch_meta_v1', JSON.stringify(m)); } catch (e) { }
   }
   function showTypo(item) {
+    clearTimeout(slowTimer);
     if (poster) poster.style.display = 'none';
     if (!typo || !typoTitle) { return later(1200); }
     typoTitle.textContent = (item && item.title) || '闻刊';
@@ -133,7 +136,9 @@
     later(1500);
   }
   function ready() {
+    clearTimeout(slowTimer);
     if (poster) poster.classList.add('loaded');
+    if (typo) typo.classList.remove('show');
     clearTimeout(maxTimer);
     later(1100);
   }
@@ -144,6 +149,10 @@
     poster.style.display = 'block';
     poster.onload = ready;
     poster.onerror = function () { showTypo(item); };
+    clearTimeout(slowTimer);
+    slowTimer = setTimeout(function () {
+      if (!poster.classList.contains('loaded')) showTypo(item);
+    }, 1400);
     poster.src = url;
     if (bg) {
       bg.style.backgroundImage = 'url("' + String(url).replace(/"/g, '%22') + '")';
