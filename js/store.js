@@ -2,7 +2,7 @@
    - 顶层带 v（schema 版本）、updatedAt（最后修改时间）
    - 只存纯 JSON，方便未来整体推送到云端
 */
-const APP_VERSION = '1.0.11';
+const APP_VERSION = '1.0.12';
 const STORE_KEY = 'watchnext_state_v1';
 
 const DEFAULT_SETTINGS = {
