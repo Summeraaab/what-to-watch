@@ -49,6 +49,10 @@ tools/make_icons.py     构建期生成图标
 
 设置里填 OpenAI 兼容的 `base_url` / `key` / `model`。AI 只改写「为什么推给你」这一句，排序始终由本地规则决定；请求失败会自动回退到规则生成的文案。
 
+## 部署
+
+推送到 `main` 后由 GitHub Actions 自动构建并发布：https://summeraaab.github.io/what-to-watch/
+
 ## 隐私
 
 TMDB Key、AI Key 与观看记录都只保存在当前设备浏览器里，不上传任何服务器。
