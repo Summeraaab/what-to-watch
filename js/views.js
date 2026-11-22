@@ -70,10 +70,11 @@ function renderProfile() {
 
   const seenRows = rated.length ? rated.map(function (it) {
     const cur = state.ratings[it.id] || 0;
-    return `<div class="seenrow"><span class="t">${esc(it.title)}</span>
+    return `<div class="seenrow"><span class="t" data-act="open" data-id="${esc(it.id)}" title="看详情" style="cursor:pointer;text-decoration:underline;text-decoration-color:rgba(255,255,255,.14);text-underline-offset:3px">${esc(it.title)}</span>
       ${[1, 2, 3, 4, 5].map(function (n) {
-        return `<button class="rchip ${cur >= n ? 'on' : ''}" data-act="rate" data-id="${esc(it.id)}" data-val="${n}" title="${n} 星" aria-label="${n} 星" style="padding:3px 4px;font-size:13px;line-height:1">★</button>`;
-      }).join('')}</div>`;
+        return `<button class="rchip ${cur >= n ? 'on' : ''}" data-act="rate" data-id="${esc(it.id)}" data-val="${n}" title="${n} 星（再点一次取消）" aria-label="${n} 星" style="padding:3px 4px;font-size:13px;line-height:1">★</button>`;
+      }).join('')}
+      <button class="rchip danger" data-act="unrate" data-id="${esc(it.id)}" title="标错了，移出看过的作品" style="padding:3px 2px;font-size:11px;border:0;background:none;color:#8a8a8a;text-decoration:underline;text-underline-offset:2px">移除</button></div>`;
   }).join('') : '<p class="hint">还没有标记过作品。</p>';
 
   const wantRows = wanted.length ? wanted.map(function (it) {
@@ -98,7 +99,7 @@ function renderProfile() {
   <div class="panel"><h4>你偏爱的标签</h4>${tagBars}
     ${moods.length ? '<h4 style="margin-top:16px">你偏爱的情绪</h4>' + moodBars : ''}
   </div>
-  <div class="panel"><h4>看过的作品</h4>${seenRows}<p class="hint">换评分会立刻改变推荐顺序。</p></div>
+  <div class="panel"><h4>看过的作品</h4>${seenRows}<p class="hint">点标题看详情；点星星改分，再点同一颗星可取消评分；标错了点「移除」，会重新参与推荐。</p></div>
   <div class="panel"><h4>想看清单 · ${wanted.length}</h4>${wantRows}<p class="hint">「感兴趣」是比评分更轻的正向信号；进了清单的不会再出现在推荐里。</p></div>
   <div class="panel"><h4>负反馈 · ${disliked.length}</h4>
     ${disliked.length ? disliked.map(function (it) { return `<div class="seenrow"><span class="t">${esc(it.title)}</span><button class="rchip" data-act="undislike" data-id="${esc(it.id)}">撤销</button></div>`; }).join('') : '<p class="hint">还没有拉黑任何一部。</p>'}
@@ -109,6 +110,151 @@ function renderProfile() {
     <p class="hint">当前：${TMDB.on() ? 'TMDB 已接入' : 'TMDB 未接入'} · ${state.settings.ai.enabled && state.settings.ai.key ? 'AI 已开启' : 'AI 未开启'}</p>
   </div>
   <p class="hint">内置片库 ${LIBRARY.length} 部，全部写在这个应用里，离线也能用。版本 v${APP_VERSION}。</p>`;
+}
+
+/* ---------- 口味分析 ---------- */
+function insightTagStats() {
+  const out = {};
+  Object.keys(state.ratings).forEach(function (id) {
+    const it = getItem(id);
+    if (!it) return;
+    const r = state.ratings[id];
+    it.tags.forEach(function (t) {
+      if (!out[t]) out[t] = { sum: 0, n: 0 };
+      out[t].sum += r; out[t].n += 1;
+    });
+  });
+  return Object.keys(out).map(function (t) { return { tag: t, avg: out[t].sum / out[t].n, n: out[t].n }; });
+}
+
+function tasteClusters(high) {
+  const used = {}, out = [];
+  while (out.length < 3) {
+    const cand = high.filter(function (it) { return !used[it.id]; });
+    if (cand.length < 2) break;
+    const cnt = {};
+    cand.forEach(function (it) { it.tags.forEach(function (t) { cnt[t] = (cnt[t] || 0) + 1; }); });
+    let best = null, bc = 1;
+    Object.keys(cnt).forEach(function (t) { if (cnt[t] > bc) { bc = cnt[t]; best = t; } });
+    if (!best) break;
+    const members = cand.filter(function (it) { return it.tags.indexOf(best) > -1; });
+    members.forEach(function (it) { used[it.id] = 1; });
+    out.push({ tag: best, members: members });
+  }
+  return out;
+}
+
+function radarSVG(rows) {
+  const n = rows.length, cx = 160, cy = 136, R = 86;
+  function pt(i, rad) {
+    const a = -Math.PI / 2 + i * 2 * Math.PI / n;
+    return [cx + Math.cos(a) * rad, cy + Math.sin(a) * rad];
+  }
+  let grid = '';
+  [0.25, 0.5, 0.75, 1].forEach(function (k) {
+    const pts = rows.map(function (r, i) {
+      const p = pt(i, R * k);
+      return p[0].toFixed(1) + ',' + p[1].toFixed(1);
+    }).join(' ');
+    grid += '<polygon points="' + pts + '" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="1"/>';
+  });
+  let poly = '', dots = '';
+  rows.forEach(function (r, i) {
+    const rad = Math.max(8, R * Math.max(0, Math.min(1, r.v)));
+    const p = pt(i, rad);
+    poly += (poly ? ' ' : '') + p[0].toFixed(1) + ',' + p[1].toFixed(1);
+    dots += '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="2.5" fill="#d8b46a"/>';
+  });
+  const labels = rows.map(function (r, i) {
+    const p = pt(i, R + 20);
+    const anchor = p[0] < cx - 10 ? 'end' : p[0] > cx + 10 ? 'start' : 'middle';
+    return '<text x="' + p[0].toFixed(1) + '" y="' + p[1].toFixed(1) + '" fill="#9a9a9a" font-size="11" text-anchor="' + anchor + '">' + esc(r.tag.slice(0, 4)) + '</text>';
+  }).join('');
+  return '<svg viewBox="0 0 320 272" style="width:100%;height:auto" role="img" aria-label="口味雷达图">' + grid +
+    '<polygon points="' + poly + '" fill="rgba(216,180,106,.16)" stroke="#d8b46a" stroke-width="1.5"/>' + dots + labels + '</svg>';
+}
+
+function renderInsight() {
+  const prof = buildProfile();
+  const ids = Object.keys(state.ratings).map(getItem).filter(Boolean);
+  const n = ids.length;
+  const head = `<div class="top"><div class="brand"><span class="dot"></span>口味分析</div><div class="cnt">${n} 部已评分</div></div>
+  <section class="hero" style="padding-bottom:12px">
+    <h1 class="serif" style="font-size:30px">你的口味，拆开看</h1>
+    <p class="lede">不只是打分本身，而是背后的结构：偏好、雷区、盲区，以及你自己可能都没注意到的摇摆。</p>
+  </section>`;
+  if (!n) {
+    return head + '<div class="panel"><p class="hint">还没有评分。去首页点「看过了」给几部打星，这里会自动长出来。</p></div>';
+  }
+
+  const vals = ids.map(function (it) { return state.ratings[it.id]; }).filter(function (v) { return v > 0; });
+  const avg = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length;
+  const sd = Math.sqrt(vals.reduce(function (s, v) { return s + (v - avg) * (v - avg); }, 0) / vals.length);
+  const highN = vals.filter(function (v) { return v >= 4; }).length;
+  const dist = [5, 4, 3, 2, 1].map(function (k) { return { k: k, c: vals.filter(function (v) { return v === k; }).length }; });
+  const distMax = Math.max(1, Math.max.apply(null, dist.map(function (d) { return d.c; })));
+  const distRows = dist.map(function (d) {
+    return `<div class="barrow"><span class="lbl">${d.k} ★</span><span class="bar"><i style="width:${Math.max(3, Math.round(d.c / distMax * 100))}%"></i></span><span class="v">${d.c}</span></div>`;
+  }).join('');
+
+  const tagRows = Object.keys(prof.tagW).filter(function (k) { return k.indexOf('节奏·') !== 0; })
+    .map(function (k) { return { tag: k, v: prof.tagW[k] }; }).filter(function (x) { return x.v > 0.02; })
+    .sort(function (a, b) { return b.v - a.v; }).slice(0, 6);
+  const radar = tagRows.length >= 3 ? radarSVG(tagRows) : '<p class="hint">标签样本还太少，标到 5 部以上会出现雷达图。</p>';
+
+  const tagStats = insightTagStats();
+  const best = tagStats.filter(function (x) { return x.n >= 2 && x.avg >= 3.4; })
+    .sort(function (a, b) { return b.avg - a.avg; }).slice(0, 4);
+  const worst = tagStats.filter(function (x) { return x.avg < 3; })
+    .sort(function (a, b) { return a.avg - b.avg; }).slice(0, 4);
+  const tagLine = function (x, danger) {
+    return `<div class="seenrow"><button class="rchip ${danger ? 'danger' : 'on'}" data-act="tag-search" data-val="${esc(x.tag)}">${esc(x.tag)}</button><span class="t">平均 ${x.avg.toFixed(1)} 星 · ${x.n} 部</span></div>`;
+  };
+  const bestHTML = best.length ? best.map(function (x) { return tagLine(x, false); }).join('') : '<p class="hint">还没有稳定的加分标签，至少给同一类打 2 部以上。</p>';
+  const worstHTML = worst.length ? worst.map(function (x) { return tagLine(x, true); }).join('') : '<p class="hint">暂未发现明显雷区。</p>';
+
+  const high = ids.filter(function (it) { return state.ratings[it.id] >= 4; });
+  const clusters = high.length >= 4 ? tasteClusters(high) : [];
+  const clustersHTML = clusters.length ? clusters.map(function (c) {
+    return `<div class="panel"><h4>「${esc(c.tag)}」型 · ${c.members.length} 部</h4>
+      <div class="simrow">${c.members.slice(0, 4).map(function (it) {
+        return `<button class="sim" data-act="open" data-id="${esc(it.id)}">${esc(it.title)}</button>`;
+      }).join('')}</div></div>`;
+  }).join('') : '<div class="panel"><p class="hint">高分作品还不够 4 部，暂时分不出口味簇。</p></div>';
+
+  const allTypes = TYPES.filter(function (t) { return t !== '全部'; });
+  const blind = allTypes.map(function (t) {
+    return { t: t, rated: ids.filter(function (it) { return it.type === t; }).length, total: allItems().filter(function (it) { return it.type === t; }).length };
+  }).filter(function (x) { return x.rated === 0 && x.total > 0; });
+  const blindHTML = blind.length
+    ? `<div class="simrow">${blind.map(function (b) {
+        return `<button class="sim" data-act="type-go" data-val="${esc(b.t)}">${esc(b.t)} · ${b.total} 部待看</button>`;
+      }).join('')}</div><p class="hint">点一个跳到片库。换口味最快的方式，是在完全没碰过的类型里先挑一部。</p>`
+    : '<p class="hint">每个类型都至少评过一部，覆盖面挺全。</p>';
+
+  const covered = new Set(ids.map(function (it) { return it.type; })).size;
+  const conf = n < 8 ? `样本只有 ${n} 部，先当参考；标到 15 部以上结论会稳很多。` : `基于 ${n} 部评分、${vals.length} 个有效星级。`;
+
+  return head + `
+  <div class="panel"><h4>一眼看懂</h4>
+    <div class="stat">
+      <div><b>${avg.toFixed(1)}</b><span>平均星</span></div>
+      <div><b>${highN}</b><span>部 4 星以上</span></div>
+      <div><b>${sd.toFixed(2)}</b><span>打分波动</span></div>
+      <div><b>${covered}/${allTypes.length}</b><span>类型覆盖</span></div>
+    </div>
+    <p class="hint">${conf}</p>
+  </div>
+  <div class="panel"><h4>评分分布</h4>${distRows}
+    <p class="hint">集中在 3 星说明你打分偏保守；两头多说明口味分化明显。</p>
+  </div>
+  <div class="panel"><h4>口味雷达 · 最突出的六个标签</h4>${radar}
+    <p class="hint">数值是相对强度，不是绝对喜好；越靠外表示这个标签在你评分里权重越高。</p>
+  </div>
+  <div class="panel"><h4>稳定加分标签</h4>${bestHTML}<p class="hint">点标签可以直接跳到片库搜同类。</p></div>
+  <div class="panel"><h4>你的雷区</h4>${worstHTML}<p class="hint">这些标签平均不到 3 星，推荐里会自动降权。</p></div>
+  ${clustersHTML}
+  <div class="panel"><h4>还没碰过的类型</h4>${blindHTML}</div>`;
 }
 
 /* ---------- 设置 ---------- */
