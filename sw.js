@@ -1,5 +1,5 @@
 /* Service Worker：把应用外壳缓存到本地，新版本自动接管 */
-const VERSION = '1.0.3';
+const VERSION = '1.0.4';
 const CACHE = 'watchnext-' + VERSION;
 const ASSETS = [
   './', './index.html', './css/app.css', './css/mobile.css',

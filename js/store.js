@@ -2,7 +2,7 @@
    - 顶层带 v（schema 版本）、updatedAt（最后修改时间）
    - 只存纯 JSON，方便未来整体推送到云端
 */
-const APP_VERSION = '1.0.3';
+const APP_VERSION = '1.0.4';
 const STORE_KEY = 'watchnext_state_v1';
 
 const DEFAULT_SETTINGS = {
@@ -15,7 +15,7 @@ function clone(o) { return JSON.parse(JSON.stringify(o)); }
 function defaultState() {
   return {
     v: 1,
-    ratings: {},      // id -> 5(很喜欢) / 3(还不错) / 1(不太喜欢)
+    ratings: {},      // id -> 1~5 星（1 很不喜欢，5 很喜欢）
     disliked: {},     // id -> true
     interested: {},   // id -> 标「感兴趣」的时间戳（想看清单）
     seenAt: {},       // id -> timestamp
