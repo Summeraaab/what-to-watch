@@ -1,5 +1,6 @@
-/* TMDB 在线数据源（可选）
-   Key 只保存在本机，不写进仓库；base/img 可改成镜像地址以适配网络环境 */
+/* TMDB 在线数据源
+   默认内置一个共享 Key，装上即用；用户可在设置里换成自己的 Key。
+   base/img 可改成镜像地址以适配网络环境 */
 const GENRE_ZH = {
   28: '动作', 12: '冒险', 16: '动画', 35: '喜剧', 80: '犯罪', 99: '纪录', 18: '剧情',
   10751: '家庭', 14: '奇幻', 36: '历史', 27: '恐怖', 10402: '音乐', 9648: '悬疑',
@@ -24,7 +25,12 @@ const TMDB = {
   lastLoaded: 0,
   details: {},
   key: function () { return (state.settings.tmdb.key || '').trim(); },
-  base: function () { return ((state.settings.tmdb.base || '').trim() || 'https://api.themoviedb.org/3').replace(/\/+$/, ''); },
+  base: function () { return ((state.settings.tmdb.base || '').trim() || 'https://api.tmdb.org/3').replace(/\/+$/, ''); },
+  /* 依次尝试：用户设置 → TMDB 备用域名，避免某个域名在本地网络被卡死 */
+  bases: function () {
+    const list = [this.base(), 'https://api.tmdb.org/3', 'https://api.themoviedb.org/3'];
+    return list.filter(function (v, i) { return v && list.indexOf(v) === i; });
+  },
   imgBase: function () { return ((state.settings.tmdb.img || '').trim() || 'https://image.tmdb.org/t/p').replace(/\/+$/, ''); },
   on: function () { return !!this.key(); },
   poster: function (it, size) { return it.posterPath ? this.imgBase() + '/' + (size || 'w342') + it.posterPath : ''; },
@@ -32,16 +38,28 @@ const TMDB = {
   api: async function (path, params) {
     const key = this.key();
     if (!key) throw new Error('还没有填写 TMDB API Key');
-    const qs = new URLSearchParams(Object.assign({ api_key: key, language: 'zh-CN' }, params || {}));
-    const ctrl = new AbortController();
-    const timer = setTimeout(function () { ctrl.abort(); }, 15000);
-    try {
-      const res = await fetch(this.base() + path + '?' + qs.toString(), { signal: ctrl.signal, cache: 'no-store' });
-      if (!res.ok) throw new Error('TMDB 返回 HTTP ' + res.status);
-      return await res.json();
-    } finally {
-      clearTimeout(timer);
+    const qs = new URLSearchParams(Object.assign({ api_key: key, language: 'zh-CN' }, params || {})).toString();
+    const hosts = this.bases();
+    let lastErr = null;
+    for (let i = 0; i < hosts.length; i++) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(function () { ctrl.abort(); }, 12000);
+      try {
+        const res = await fetch(hosts[i] + path + '?' + qs, { signal: ctrl.signal, cache: 'no-store' });
+        if (!res.ok) {
+          const err = new Error('TMDB 返回 HTTP ' + res.status);
+          err.hard = res.status >= 400 && res.status < 500;
+          throw err;
+        }
+        return await res.json();
+      } catch (e) {
+        lastErr = e;
+        if (e && e.hard) throw e;
+      } finally {
+        clearTimeout(timer);
+      }
     }
+    throw lastErr || new Error('TMDB 连不上，检查网络或换个 API 地址');
   },
 
   async test() {
